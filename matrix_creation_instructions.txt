@@ -1,48 +1,135 @@
-These are the instructions to create a matrix. These instructions assume you have the 7*12 (BE price * GHG price) MAgPIE scenario outputs already created. For example, if your output folder is called output_folder, and you did not make any changes in the output file names, then you should have a directory structure as follows:
+These are the instructions to create a matrix. These instructions assume you have the 7*12 (BE price
+* GHG price) MAgPIE scenario outputs already created — both price-driven and demand-driven runs.
+For example, if your output folder is called output_folder, you should have a directory structure as
+follows:
 
-<repo_name>/magpie/output/<output_folder_name>/SSP2_BD{BD_val}/ [where BD_val is two digits representing the BII target, e.g. "00" or "78"]
+<repo_name>/magpie/output/<output_folder_name>/SSP2_BD-{BD_val}/
+  [where BD_val is "none" or "high", referring to the biodiversity scenario]
 
-And in this above directory you should have files named:
+In this directory you should have folders named:
 
-SSP2_BD{BD_val}_BE{BE_val}_G{GHG_val}demand_rev{rev_val} [where BE_val is "00", "05",..., "45"; GHG_val is "0000", "0010",..., "4000"; and rev_val is "1", "2" etc.].
+  SSP2_BD-{BD_val}_BE{BE_val}_G{GHG_val}price_rev{N}   (price-driven runs, 7 per BD scenario)
+  SSP2_BD-{BD_val}_BE{BE_val}_G{GHG_val}demand_rev{N}  (demand-driven runs, 84 per BD scenario)
 
-For example, in my output folder, the directory is called: "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2025-07-02/magpie/output/Matrix_test_rev1/SSP2_BD00" and a sample output scenario from this directory is called "SSP2_BD00_BE00_G0000demand_rev1".
+where BE_val is "00", "05", "07", "10", "15", "25", "45"; GHG_val is "0000", "0010", ..., "4000";
+and rev{N} is the revision number (e.g. "rev2", "rev3").
 
-Assuming you have all these, the next step is to create a matrix. For this, please download the necessary matrix creation files from the matrix repo we have created: https://github.com/sreyam-sengupta/matrix_generation
+For example:
+  output/Spatially_resolved_BII_rev2/SSP2_BD-none/SSP2_BD-none_BE00_G0000demand_rev2
 
-Below, we briefly discuss what the files here are used for.
+Assuming you have all these, the next step is to create a matrix. For this, please use the files
+on the 3_BE_prices branch of the matrix generation repo:
+https://github.com/sreyam-sengupta/matrix_generation/tree/3_BE_prices
 
-***************************************************************************
-
-(I) "2025-11-18_MMEmu_createMatrix-MP_loop_trimmed.R" - this is the matrix generation script, the longest and most important file. It contains all the instructions to process the MAgPIE outputs into a matrix that is ready for MESSAGE. There are 3 stages here: "raw", "map", and "matrix". I briefly describe what those steps mean:
-
-(a) "raw" phase: this is the first and most time-consuming phase. In this phase, the script first checks if each run is finished, then extracts variables (both from the 'fulldata.gdx' as well as 'report.mif') including prices (the price-driven runs are needed here), and writes them to a so-called "raw" file. The output of this step are 84 files named "SSP2_BD{BD_val}_BE{BE_val}_G{GHG_val}raw.csv" and they are stored in a folder of your choice. In this files, the variables still have their MAgPIE names.
-
-(b) "map" phase: in this phase, the raw files are "translated" from MAgPIE to MESSAGEix. Basically, the variables are either renamed or aggregated from their MAgPIE names to MESSAGEix naming conventions. All unit conversions are also done in this step. The mapping file is required in this step. During this step, each of the 84 raw files is converted into a "map" file with the name "SSP2_BD{BD_val}_BE{BE_val}_G{GHG_val}map.csv", and at the end of the map phase, these 84 map files are all aggregated to a single premap file called "magpie_input-premap_SSP2_BD00_trimmed_{timestamp}.csv".
-
-(c) "matrix" phase: this is the shortest phase, it takes the premap file generated in the map phase and renames the regions to MESSAGEix names, and reorders, reformats, and otherwise organizes the premap file into a clean matrix ready for MESSAGEix. The output of this step is the final matrix that you can use for MESSAGEix input.
-
-User input section of matrix creation file: there are several places where your user input is required:
-Line 14: the output folder of your MAgPIE main folder where the runs are being generated.
-Line 17: scenario name prefix ("SSP2_BD00" in our case).
-Line 20 & 21: run suffixes for price-driven and demand-driven runs (if you didn't change the default in the MAgPIE "GENIE_Di_script.R", then no need to change these).
-Line 24: the BE_price values that the script expects (change these if you want to run a reduced matrix, e.g. only with BE00 and BE45).
-Line 42: the GHG_price values (same principle, change these if you are running a reduced matrix, e.g. GHG0000 and GHG4000).
-Line 45: the folder where you want to keep the output matrix.
-Line 48: the location of the map file.
-Line 51: the location of the "vars_to_keep" file.
-Line 57: the phases (raw, map, and matrix); only change these if you are re-running the matrix generation script, and already have the raw files, for example.
-Lines 61-66: other settings that you usually will not need to change.
+Below, we briefly describe each file and what it does.
 
 ***************************************************************************
 
-(II) "2025-11-28_map_magpie_message_human_corrected.csv" - this is the map file. It contains instructions on how to translate the MAgPIE outputs into MESSAGEix-readable input. For example, if a variable name needs to be translated, or several variables need to be aggregated, or if units need to be converted. The first column "piam_variable" is the MAgPIE name (PIAM stands for "PIK Integrated Assessment Model"); the second column "Variable" is the name MESSAGEix expects; the third column "factor" is the unit conversion factor (e.g., MAgPIE reports N2O emissions in Mt N2O/yr but MESSAGEix expects them in kt N2O/yr); the fourth column "weight" is if many MAgPIE variables need to be aggregated to a single MESSAGEix variable, with non-uniform weights ("NULL" means uniform weights I think); and finally "spatial" column is the spatial aggregation level ("reg+glo" means both regional and global aggregations will be created).
+(I) "2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
 
-This file is a data file, and an instruction to the matrix generation script. It is usually not meant to be modified.
+This is the main matrix generation script. It processes MAgPIE outputs into a matrix ready for
+MESSAGE. There are 3 stages: "raw", "map", and "matrix". These are described briefly below:
+
+(a) "raw" phase: the first and most time-consuming phase. The script checks if each run is finished,
+then extracts variables from both 'fulldata.gdx' and 'report.mif' (including bioenergy prices from
+the price-driven runs), and writes them to a "raw" file. Output: 84 files named
+"SSP2_BD-{BD_val}_BE{BE_val}_G{GHG_val}raw.csv", stored in the matrix output folder. Variables
+still have their MAgPIE names at this stage.
+
+(b) "map" phase: translates the raw files from MAgPIE to MESSAGEix naming conventions (variable
+renaming, aggregation, and unit conversions). Uses the mapping file. Each of the 84 raw files
+becomes a "map" file; at the end all 84 are aggregated into a single premap file named
+"magpie_input-premap_SSP2_BD-{BD_val}_trimmed_{timestamp}.csv".
+
+(c) "matrix" phase: the shortest phase. Takes the premap file and renames regions to MESSAGEix
+names, reorders and reformats the data into the final matrix ready for MESSAGEix input. Output:
+"2026-03-20_magpie_input_SSP2_BD-{BD_val}.csv".
+
+User input section (lines 12-86 of the script):
+  Line 18:  bd_scenario — "none" or "high" (can also be passed as a command-line argument)
+  Line 22:  base_output_dir — the MAgPIE output folder containing the runs
+  Line 28:  scenario_name — prefix for run folder names (e.g. "SSP2_BD-none")
+  Line 31:  run_suffix_demand — suffix for demand-driven run folders (e.g. "demand_rev2")
+  Line 32:  run_suffix_price  — suffix for price-driven run folders (e.g. "G0000price_rev2")
+  Line 35:  be_price_values_all — list of BE price levels to process (default: 0,5,7,10,15,25,45)
+  Line 53:  ghg_price_values — list of GHG price levels to process (default: 0,10,...,4000)
+  Line 56:  matrix_output_dir — folder where output matrix files are written
+  Line 62:  map_file — path to the mapping CSV (file II below)
+  Line 65:  vars_to_keep_file — path to the variable filter CSV (file III below)
+  Line 71:  phases — which phases to run ("raw", "map", "matrix"); can be overridden at runtime by
+            setting the environment variable PHASES_FILTER (e.g. PHASES_FILTER="map,matrix" to skip
+            the raw phase when raw files already exist)
+  Lines 80-85: other settings (reduced_messages, loop, check_file, correct_emissions, baseyear)
+            — these usually do not need to be changed.
+
+The script is designed to be run in parallel using the master bash script (file IV below):
+  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R none  # BD-none scenario
+  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R high  # BD-high scenario
 
 ***************************************************************************
 
-2025-11-18_vars_to_keep.csv
-(III) "2025-11-18_vars_to_keep.csv" - this is just a list of variables which will be kept in the final matrix. This is also instruction to the matrix generation script and as such usually is not modified.
+(II) "2026-03-20_map_magpie_message_human_corrected.csv"
+
+The mapping file. It contains instructions on how to translate MAgPIE outputs into MESSAGEix-
+readable input: variable renaming, aggregation, and unit conversions. Columns:
+  - piam_variable: MAgPIE variable name (PIAM = PIK Integrated Assessment Model)
+  - Variable: MESSAGEix variable name
+  - factor: unit conversion factor (e.g. Mt N2O/yr -> kt N2O/yr uses factor 1000)
+  - weight: aggregation weight when many MAgPIE variables map to one MESSAGEix variable
+            (NULL = uniform weights)
+  - spatial: spatial aggregation level ("reg+glo" = both regional and global)
+
+This file is a data file and an instruction to the matrix script. It is usually not modified.
+
+***************************************************************************
+
+(III) "2026-03-20_vars_to_keep.csv"
+
+A list of MESSAGEix variable names that will be retained in the final matrix. All other variables
+are dropped after the map phase. This file is also an instruction to the matrix script and is
+usually not modified.
+
+***************************************************************************
+
+(IV) "2026-03-20_run_matrix_pipeline.sh"
+
+The master bash script that orchestrates the full matrix generation pipeline. It launches the
+main loop script (file I) in parallel for each BD scenario and BE price level, then runs the
+post-processing script (file V) on the completed matrices. Usage:
+
+  bash 2026-03-20_run_matrix_pipeline.sh              # sequential
+  PARALLEL=true bash 2026-03-20_run_matrix_pipeline.sh  # parallel (recommended)
+
+To skip the raw phase (if raw files already exist):
+  PHASES_FILTER="map,matrix" bash 2026-03-20_run_matrix_pipeline.sh
+
+***************************************************************************
+
+(V) "2026-03-20_add_bioenergy_prices.R"
+
+Post-processing script that adds three bioenergy price columns to the final matrix output from
+file I. It reads both the price-driven GDX files and both price- and demand-driven report.mif
+files to construct three distinct bioenergy price variables:
+
+  P1 — Price|Primary Energy|Biomass_exo_P1
+       The exogenous bioenergy subsidy, read directly from the GAMS parameter
+       i60_2ndgen_bioenergy_subsidy in the price-driven fulldata.gdx. This is the subsidy that
+       was imposed on the model to incentivise bioenergy production. For BE00 runs it is always
+       zero; for BE45 it follows a linear 0->45 US$/GJ trajectory over time.
+
+  P2 — Price|Primary Energy|Biomass_endo_P2_price-driven
+       The endogenous market-clearing price of bioenergy, read from Prices|Bioenergy in the
+       price-driven report.mif. This is the shadow price (marginal) of the supply-demand balance
+       equation oq16_supply_crops for bioenergy crops (begr/betr). It reflects the equilibrium
+       price resulting from the imposed subsidy.
+
+  P3 — Price|Primary Energy|Biomass_endo_P3_demand-driven
+       The same endogenous market-clearing price, but read from the demand-driven report.mif.
+       This reflects the bioenergy price when bioenergy demand is fixed exogenously (derived
+       from the price-driven runs) rather than driven by a price incentive.
+
+These three columns capture different aspects of bioenergy pricing and are all appended to the
+final matrix. The script is called automatically by the master pipeline script (file IV) after
+the matrix phase completes.
 
 ***************************************************************************
