@@ -5,6 +5,7 @@
 # Runs the full pipeline sequentially for both BD scenarios:
 #   1. raw + map + matrix phases  (2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R)
 #   2. add bioenergy prices        (2026-03-20_add_bioenergy_prices.R)
+#   3. add woodfuel to bioenergy   (2026-04-09_add_woodfuel_to_bioenergy.R)
 #
 # Usage:
 #   bash 2026-03-20_run_matrix_pipeline.sh              # runs both BD-none and BD-high
@@ -22,6 +23,7 @@ set -euo pipefail
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOOP_SCRIPT="$SCRIPT_DIR/2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
 POST_SCRIPT="$SCRIPT_DIR/2026-03-20_add_bioenergy_prices.R"
+WOOD_SCRIPT="$SCRIPT_DIR/2026-04-09_add_woodfuel_to_bioenergy.R"
 LOG_DIR="$SCRIPT_DIR/output/logs"
 mkdir -p "$LOG_DIR"
 
@@ -77,6 +79,14 @@ run_post() {
     log "BD-${bd}: bioenergy prices added"
 }
 
+run_woodfuel_post() {
+    local bd="$1"
+    local logfile="$LOG_DIR/add_woodfuel_BD-${bd}_$(date '+%Y%m%d-%H%M%S').log"
+    log "BD-${bd}: adding woodfuel to Primary Energy|Biomass → $logfile"
+    Rscript "$WOOD_SCRIPT" "$bd" 2>&1 | tee "$logfile"
+    log "BD-${bd}: woodfuel post-processing added"
+}
+
 # ---- Main ----
 log "Pipeline starting. BD scenarios: ${BD_SCENARIOS[*]}"
 log "Parallel raw phase: $PARALLEL"
@@ -91,9 +101,11 @@ for bd in "${BD_SCENARIOS[@]}"; do
     fi
 
     run_post "$bd"
+    run_woodfuel_post "$bd"
 
     log "===== BD-${bd}: DONE ====="
     log "Final matrix: $SCRIPT_DIR/output/2026-03-20_magpie_input_SSP2_BD-${bd}_with_BE_prices.csv"
+    log "Final matrix (with woodfuel): $SCRIPT_DIR/output/2026-04-09_magpie_input_SSP2_BD-${bd}_with_woodfuel.csv"
 done
 
 log "All done!"

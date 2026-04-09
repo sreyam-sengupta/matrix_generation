@@ -18,8 +18,8 @@ For example:
   output/Spatially_resolved_BII_rev2/SSP2_BD-none/SSP2_BD-none_BE00_G0000demand_rev2
 
 Assuming you have all these, the next step is to create a matrix. For this, please use the files
-on the 3_BE_prices branch of the matrix generation repo:
-https://github.com/sreyam-sengupta/matrix_generation/tree/3_BE_prices
+on the add_woodfuel_to_bioenergy branch of the matrix generation repo:
+https://github.com/sreyam-sengupta/matrix_generation/tree/add_woodfuel_to_bioenergy
 
 Below, we briefly describe each file and what it does.
 
@@ -95,7 +95,7 @@ usually not modified.
 
 The master bash script that orchestrates the full matrix generation pipeline. It launches the
 main loop script (file I) in parallel for each BD scenario and BE price level, then runs the
-post-processing script (file V) on the completed matrices. Usage:
+post-processing scripts (files V and VI) on the completed matrices. Usage:
 
   bash 2026-03-20_run_matrix_pipeline.sh              # sequential
   PARALLEL=true bash 2026-03-20_run_matrix_pipeline.sh  # parallel (recommended)
@@ -131,5 +131,44 @@ files to construct three distinct bioenergy price variables:
 These three columns capture different aspects of bioenergy pricing and are all appended to the
 final matrix. The script is called automatically by the master pipeline script (file IV) after
 the matrix phase completes.
+
+***************************************************************************
+
+(VI) "2026-04-09_add_woodfuel_to_bioenergy.R"
+
+Post-processing script that updates an already generated matrix by adding woodfuel energy into
+"Primary Energy|Biomass". It is designed to run after file V.
+
+What it does:
+  1. Reads the matrix with BE prices, e.g.
+     "2026-03-20_magpie_input_SSP2_BD-none_with_BE_prices.csv"
+  2. Loops over all 84 demand-driven runs (7 BE x 12 GHG) and reads each run's fulldata.gdx.
+  3. Extracts woodfuel demand from:
+       pm_demand_forestry[woodfuel]  (mass units)
+  4. Reads mass-to-energy coefficient from:
+       fm_attributes[woodfuel, ge]   (GJ/tDM)
+  5. Converts mass to energy and maps region names to matrix regions:
+       EJ = (million tons) * 1e6 * (GJ/t) / 1e9
+  6. Adds the resulting EJ values to existing rows:
+       Variable == "Primary Energy|Biomass"
+  7. Writes a new output matrix:
+       "2026-04-09_magpie_input_SSP2_BD-{BD_val}_with_woodfuel.csv"
+
+No raw/map/matrix rerun is needed for this step. This script can be used both in the full
+pipeline and for backfilling previously generated matrices.
+
+***************************************************************************
+
+(VII) "2026-04-09_woodfuel_verification.R"
+
+Verification script located at:
+  /p/projects/magpie/users/sreyamse/running_output/scripts/2026-04-09_woodfuel_verification.R
+
+It compares the matrix before and after woodfuel addition and reports:
+  - whether all expected World biomass scenario rows are present (84 = 7 BE x 12 GHG)
+  - yearly global deltas after woodfuel addition
+  - sample scenario-level deltas (e.g. 2050 and 2100)
+
+Use this script after running file VI to verify that woodfuel was integrated correctly.
 
 ***************************************************************************
