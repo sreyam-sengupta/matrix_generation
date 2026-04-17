@@ -25,16 +25,17 @@ Below, we briefly describe each file and what it does.
 
 ***************************************************************************
 
-(I) "2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
+(I) "2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R"
 
 This is the main matrix generation script. It processes MAgPIE outputs into a matrix ready for
 MESSAGE. There are 3 stages: "raw", "map", and "matrix". These are described briefly below:
 
-(a) "raw" phase: the first and most time-consuming phase. The script checks if each run is finished,
-then extracts variables from both 'fulldata.gdx' and 'report.mif' (including bioenergy prices from
-the price-driven runs), and writes them to a "raw" file. Output: 84 files named
-"SSP2_BD-{BD_val}_BE{BE_val}_G{GHG_val}raw.csv", stored in the matrix output folder. Variables
-still have their MAgPIE names at this stage.
+(a) "raw" phase: the first and most time-consuming phase. The script checks that reporting is
+finished (default: `report.mif` present and large enough), then builds the raw magpie object
+primarily from `report.mif` using variables listed in the mapping file (plus an AFOLU aggregate
+when needed). Output: 84 files named
+"SSP2_BD-{BD_val}_BE{BE_val}_G{GHG_val}raw.csv", under the matrix output folder (see below).
+Variables still have their MAgPIE names at this stage.
 
 (b) "map" phase: translates the raw files from MAgPIE to MESSAGEix naming conventions (variable
 renaming, aggregation, and unit conversions). Uses the mapping file. Each of the 84 raw files
@@ -43,28 +44,22 @@ becomes a "map" file; at the end all 84 are aggregated into a single premap file
 
 (c) "matrix" phase: the shortest phase. Takes the premap file and renames regions to MESSAGEix
 names, reorders and reformats the data into the final matrix ready for MESSAGEix input. Output:
-"2026-03-20_magpie_input_SSP2_BD-{BD_val}.csv".
+"2026-03-20_magpie_input_SSP2_BD-{BD_val}.csv" (under the matrix output root).
 
-User input section (lines 12-86 of the script):
-  Line 18:  bd_scenario — "none" or "high" (can also be passed as a command-line argument)
-  Line 22:  base_output_dir — the MAgPIE output folder containing the runs
-  Line 28:  scenario_name — prefix for run folder names (e.g. "SSP2_BD-none")
-  Line 31:  run_suffix_demand — suffix for demand-driven run folders (e.g. "demand_rev2")
-  Line 32:  run_suffix_price  — suffix for price-driven run folders (e.g. "G0000price_rev2")
-  Line 35:  be_price_values_all — list of BE price levels to process (default: 0,5,7,10,15,25,45)
-  Line 53:  ghg_price_values — list of GHG price levels to process (default: 0,10,...,4000)
-  Line 56:  matrix_output_dir — folder where output matrix files are written
-  Line 62:  map_file — path to the mapping CSV (file II below)
-  Line 65:  vars_to_keep_file — path to the variable filter CSV (file III below)
-  Line 71:  phases — which phases to run ("raw", "map", "matrix"); can be overridden at runtime by
-            setting the environment variable PHASES_FILTER (e.g. PHASES_FILTER="map,matrix" to skip
-            the raw phase when raw files already exist)
-  Lines 80-85: other settings (reduced_messages, loop, check_file, correct_emissions, baseyear)
-            — these usually do not need to be changed.
+Runtime environment variables (optional):
+  MATRIX_OUTPUT_ROOT — if set, all outputs from this script go under this directory: the final
+            matrix CSV, the user log `2026-03-20_matrix_log_<scenario>.txt`, the scenario
+            subfolder (raw/map/premap/missing-scenarios CSV). Use a scratch path for test runs.
+  PHASES_FILTER — comma-separated subset of raw,map,matrix (e.g. "map,matrix").
+  BE_PRICE_FILTER — numeric BE level for parallel raw-only shards (see master bash script).
+  RERUN_MISSING_ONLY — if true, only scenarios listed in the previous `missing_scenarios_*.csv`.
+
+Other settings (paths, phases default, check_file, etc.) are in the script header — edit there
+for MAgPIE output location and mapping paths.
 
 The script is designed to be run in parallel using the master bash script (file IV below):
-  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R none  # BD-none scenario
-  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R high  # BD-high scenario
+  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R none  # BD-none scenario
+  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R high  # BD-high scenario
 
 ***************************************************************************
 

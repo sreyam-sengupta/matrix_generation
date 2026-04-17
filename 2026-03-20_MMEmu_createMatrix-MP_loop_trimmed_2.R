@@ -3,7 +3,6 @@ library(magpie4)
 library(madrat)
 library(stringr)
 library(magpiesets)
-library(gdx)
 library(piamInterfaces)
 library(iamc)
 library(hash)
@@ -12,8 +11,8 @@ library(hash)
 # ===== User input (adjust as needed) =====
 # BD scenario: "none" or "high"
 # Can be overridden by passing it as a command-line argument:
-#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R none
-#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R high
+#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R none
+#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R high
 args <- commandArgs(trailingOnly = TRUE)
 bd_scenario <- if (length(args) >= 1 && args[1] %in% c("none", "high")) args[1] else "none"
 message("BD scenario: ", bd_scenario)
@@ -29,7 +28,8 @@ scenario_name <- paste0("SSP2_BD-", bd_scenario)
 
 # Run folder pattern: SSP2_BD-{bd}_BE{BE_price}_G{GHG_price}demand_rev2
 run_suffix_demand <- "demand_rev2"      # suffix for demand-driven runs
-run_suffix_price  <- "G0000price_rev2"  # suffix for price-driven runs (for bioenergy prices)
+# Reference only: price-driven folder suffix (e.g. for add_bioenergy_prices.R); not read in this script.
+run_suffix_price  <- "G0000price_rev2"
 
 # BE price values (used in folder names: SSP2_BD-{bd}_BE{xx}_G{yyyy}demand_rev2)
 be_price_values_all <- c(0, 5, 7, 10, 15, 25, 45) # 0, 5, 7, 10, 15, 25, 45
@@ -52,11 +52,17 @@ if (be_price_filter != "") {
 # GHG price values (used in folder names: SSP2_BD00_BE{xx}_G{yyyy}demand_rev1)
 ghg_price_values <- c(0, 10, 20, 50, 100, 200, 400, 600, 1000, 2000, 3000, 4000) # 0, 10, 20, 50, 100, 200, 400, 600, 1000, 2000, 3000, 4000
 
-# Output folder for matrix files (BD-scenario-specific subfolder created automatically)
-matrix_output_dir <- file.path(
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/output",
-  scenario_name
-)
+# Output root for matrix intermediates and final CSV (default: PIK matrix_creation/output).
+# Set MATRIX_OUTPUT_ROOT to a scratch path for dry runs so existing production files are not overwritten.
+matrix_output_root_default <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/output"
+matrix_output_root <- Sys.getenv("MATRIX_OUTPUT_ROOT", unset = "")
+if (nzchar(matrix_output_root)) {
+  message("MATRIX_OUTPUT_ROOT is set; all matrix outputs go under: ", matrix_output_root)
+} else {
+  matrix_output_root <- matrix_output_root_default
+}
+# BD-scenario-specific subfolder (raw/map/missing report/premap with timestamp)
+matrix_output_dir <- file.path(matrix_output_root, scenario_name)
 
 # Full mapping file for MESSAGE (we'll filter output after mapping)
 map_file <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/2026-03-20_map_magpie_message_human_corrected.csv"
@@ -76,13 +82,16 @@ if (phases_filter != "") {
   message("Phases overridden by PHASES_FILTER: ", paste(phases, collapse = ", "))
 }
 
+# If TRUE, only process scenarios listed in the previous missing-scenarios report.
+rerun_missing_only <- tolower(Sys.getenv("RERUN_MISSING_ONLY", "false")) %in% c("true", "1", "yes")
+
 # Other settings
 reduced_messages <- FALSE
 loop <- FALSE  # loop over raw and map process until no new raw files have been generated
 loop_wait <- 0  # wait time before restarting the loop (increased with every loop, reset to 0 if raw file is written)
 check_file <- "report.mif"# "cell.bii_0.5.nc" file to check if run is finished
 correct_emissions <- FALSE  # flatten emissions curves across GHG price levels
-baseyear <- "y2005"  # base year for price index
+baseyear <- "y2005"  # unused here; kept for compatibility with older script versions
 # ========================================
 
 
@@ -101,125 +110,6 @@ sum_glo <- function(b) {
     return(b)
 }
 
-getReportMESSAGE <- function(
-  gdx, file = NULL, detail = TRUE, baseyear = "y2005", bii_path = ".", food_only = FALSE, ...) {
-
-  tryReport <- function(report, width, gdx) {
-    regs  <- c(readGDX(gdx, "i"), "GLO")
-    years <- readGDX(gdx, "t")
-    message("   ", format(report, width = width), appendLF = FALSE)
-    x <- try(
-      eval(parse(text = paste0("suppressMessages(", report, ")"))
-      ), silent = TRUE)
-    if (is(x, "try-error")) {
-      message("ERROR")
-      x <- NULL
-    } else if (is.null(x)) {
-      message("no return value")
-      x <- NULL
-    } else if (!is.magpie(x)) {
-      message("ERROR - no magpie object")
-      x <- NULL
-    } else if (!setequal(getYears(x), years)) {
-      message("ERROR - wrong years")
-      x <- NULL
-    } else if (!setequal(getRegions(x), regs)) {
-      message("ERROR - wrong regions")
-      x <- NULL
-    } else if (any(grepl(".", getNames(x), fixed = TRUE))) {
-      message("ERROR - data names contain dots (.)")
-      x <- NULL
-    } else {
-      message("success")
-    }
-    return(x)
-  }
-
-  tryList <- function(..., gdx) {
-    width <- max(nchar(c(...))) + 1
-    return(lapply(unique(list(...)), tryReport, width, gdx))
-  }
-
-  message("Start getReportMESSAGE(gdx)...")
-
-  if (!food_only) {
-
-    output <- tryList(
-                      "reportPopulation(gdx)",
- #                    "reportIncome(gdx)",
- #                    "reportProducerPriceIndex(gdx)",
- #                    "reportPriceGHG(gdx)",
- #                    "reportFoodExpenditure(gdx)",
-                      "reportKcal(gdx,detail=detail)",
- #                    "reportIntakeDetailed(gdx,detail=detail)",
- #                    "reportLivestockShare(gdx)",
- #                    "reportLivestockDemStructure(gdx)",
- #                    "reportVegfruitShare(gdx)",
- #                    "reportHunger(gdx)",
- #                    "reportPriceShock(gdx)",
- #                    "reportPriceElasticities(gdx)",
-                      "reportBII(gdx)",
-                      "reportProduction(gdx,detail=detail,agmip=TRUE)",
-                      "reportDemand(gdx,detail=detail,agmip=TRUE)",
-                      "reportDemandBioenergy(gdx,detail=detail)",
- #                    "reportFeed(gdx,detail=detail)",
- #                    "reportTrade(gdx,detail=detail)",
-                      "reportLandUse(gdx)",
- #                    "reportLandUseChange(gdx)",
- #                    "reportProtectedArea(gdx)",  # Function no longer exists
-                      "reportCroparea(gdx,detail=detail)",
-                      "reportNitrogenBudgetCropland(gdx)",
- #                     "reportNitrogenBudgetPasture(gdx)",
- #                    "reportManure(gdx)",
-                      "reportYields(gdx,detail=detail)",
-                      "reportTau(gdx)",
- #                    "reportTc(gdx)",
-                      "reportCostTC(gdx)",
- #                    "reportYieldShifter(gdx)",
-                      "reportEmissions(gdx)",
- #                    "reportEmisAerosols(gdx)",
- #                    "reportEmissionsBeforeTechnicalMitigation(gdx)",
- #                    "reportEmisPhosphorus(gdx)",
- #                    "reportCosts(gdx)",
- #                    "reportCostsPresolve(gdx)",
-                      "reportPriceFoodIndex(gdx, baseyear = baseyear)",
- #                    "reportPriceAgriculture(gdx)",
-                     "reportPriceBioenergy(gdx)",
- #                    "reportPriceLand(gdx)",
-                      "reportPriceWater(gdx)",
- #                    "reportValueTrade(gdx)",
- #                    "reportValueConsumption(gdx)",
- #                    "reportProcessing(gdx, indicator='primary_to_process')",
- #                    "reportProcessing(gdx, indicator='secondary_from_primary')",
- #                    "reportAEI(gdx)",
-                      "reportWaterUsage(gdx)",
- #                    "reportAAI(gdx)",
- #                    "reportSOM(gdx)",
- #                    "reportGrowingStock(gdx)",
- #                    "reportSDG1(gdx)",
-                      "reportSDG2(gdx)",
- #                    "reportSDG3(gdx)",
- #                    "reportSDG6(gdx)",
- #                    "reportSDG12(gdx)",
- #                    "reportSDG15(gdx)",
- #                    "reportForestYield(gdx)",
-                      "reportharvested_area_timber(gdx)",
- #                    "reportPlantationEstablishment(gdx)",
- #                    "reportRotationLength(gdx)",
-                      "reportTimber(gdx)",
- #                    "reportPBbiosphere(gdx, dir=bii_path)",
-                      gdx = gdx)
-  }  else {
-    output <- tryList(
-                      "reportDemand(gdx,detail=detail,agmip=TRUE)",
-                      gdx = gdx)
-  }
-
-
-  if (!is.null(file)) write.report2(output, file = file, ...)
-  else return(output)
-}
-
 # Create output directory if it doesn't exist
 if (!dir.exists(matrix_output_dir)) {
   dir.create(matrix_output_dir, recursive = TRUE)
@@ -233,9 +123,92 @@ time <- format(Sys.time(), "%y%m%d-%H%M%S")
 # Single premap and matrix files (outside loops - will contain all scenarios)
 ofile <- file.path(matrix_output_dir, paste0("magpie_input-premap_", scenario_name, "_trimmed_", time, ".csv"))
 matrix_file <- file.path(
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/output",
+  matrix_output_root,
   paste0("2026-03-20_magpie_input_", scenario_name, ".csv")
 )
+missing_report_file <- file.path(matrix_output_dir, paste0("missing_scenarios_", scenario_name, ".csv"))
+# User-facing run log (same directory as final matrix CSV)
+matrix_user_log_file <- file.path(
+  matrix_output_root,
+  paste0("2026-03-20_matrix_log_", scenario_name, ".txt")
+)
+
+build_scenario_id <- function(be, ghg) {
+  paste0("BE", str_pad(be, 2, pad = "0"), "_GHG", str_pad(ghg, 4, pad = "0"))
+}
+
+expected_scenarios <- expand.grid(
+  be = be_price_values,
+  ghg = ghg_price_values,
+  KEEP.OUT.ATTRS = FALSE,
+  stringsAsFactors = FALSE
+)
+expected_scenarios$scenario_id <- mapply(build_scenario_id, expected_scenarios$be, expected_scenarios$ghg)
+
+rerun_targets <- character(0)
+if (rerun_missing_only) {
+  if (file.exists(missing_report_file)) {
+    prev_missing <- tryCatch(
+      read.csv(missing_report_file, stringsAsFactors = FALSE),
+      error = function(e) NULL
+    )
+    if (!is.null(prev_missing) && "scenario_id" %in% names(prev_missing)) {
+      rerun_targets <- unique(prev_missing$scenario_id)
+      message("RERUN_MISSING_ONLY enabled. Will process ", length(rerun_targets), " scenario(s) from: ", missing_report_file)
+      if (length(rerun_targets) == 0) {
+        message("Previous missing report has no scenarios. Nothing to rerun.")
+      }
+    } else {
+      warning("RERUN_MISSING_ONLY enabled but missing report could not be read correctly: ", missing_report_file)
+    }
+  } else {
+    warning("RERUN_MISSING_ONLY enabled but missing report file not found: ", missing_report_file)
+  }
+}
+
+scenario_status <- data.frame(
+  scenario_id = expected_scenarios$scenario_id,
+  be = expected_scenarios$be,
+  ghg = expected_scenarios$ghg,
+  run_folder = NA_character_,
+  report_mif_exists = FALSE,
+  raw_exists = FALSE,
+  map_exists = FALSE,
+  premap_written = FALSE,
+  skipped_by_rerun_filter = FALSE,
+  missing_reason = "",
+  stringsAsFactors = FALSE
+)
+
+append_matrix_user_log <- function(..., also_message = TRUE) {
+  msg <- paste0(..., collapse = "")
+  ts <- format(Sys.time(), "%Y-%m-%dT%H:%M:%S", tz = "Europe/Vienna")
+  line <- paste0("[", ts, " Europe/Vienna] ", msg, "\n")
+  cat(line, file = matrix_user_log_file, append = TRUE)
+  if (also_message) message(msg)
+}
+
+writeLines(
+  c(
+    paste0("# Matrix generation user log — ", scenario_name),
+    paste0("Started (Europe/Vienna): ", format(Sys.time(), "%Y-%m-%d %H:%M:%S %z", tz = "Europe/Vienna")),
+    paste0("R: ", R.version.string),
+    paste0("Phases: ", paste(phases, collapse = ", ")),
+    paste0("BE_PRICE_FILTER: ", Sys.getenv("BE_PRICE_FILTER")),
+    paste0("PHASES_FILTER: ", Sys.getenv("PHASES_FILTER")),
+    paste0("RERUN_MISSING_ONLY: ", Sys.getenv("RERUN_MISSING_ONLY")),
+    paste0("MATRIX_OUTPUT_ROOT: ", Sys.getenv("MATRIX_OUTPUT_ROOT", unset = "(unset, default PIK path)")),
+    paste0("MAgPIE output folder: ", base_output_dir),
+    paste0("Intermediate folder (raw/map/premap/missing CSV): ", matrix_output_dir),
+    paste0("Final matrix CSV: ", matrix_file),
+    paste0("This log file: ", matrix_user_log_file),
+    paste0("Missing-scenarios detail CSV: ", missing_report_file),
+    paste0("Premap file (this run): ", ofile),
+    ""
+  ),
+  matrix_user_log_file
+)
+message("User-facing run log: ", matrix_user_log_file)
 
 # Remove existing premap file if starting fresh (only if map or matrix phase will run)
 if (("map" %in% phases || "matrix" %in% phases) && file.exists(ofile)) {
@@ -267,6 +240,65 @@ strip_units <- function(var_name) {
   }, USE.NAMES = FALSE)
 }
 
+# Third-dimension item names; works for reporting stacks with a named "variable"
+# subdimension and for objects built via new.magpie from report.mif (flat names).
+magpie_data_names <- function(x) {
+  fd <- getNames(x, fulldim = TRUE)
+  if (is.list(fd) && "variable" %in% names(fd)) {
+    return(fd$variable)
+  }
+  getNames(x)
+}
+
+magpie_first_name_matching <- function(x, base_no_unit) {
+  nms <- magpie_data_names(x)
+  hits <- nms[strip_units(nms) == base_no_unit]
+  if (length(hits) < 1) {
+    return(NA_character_)
+  }
+  hits[[1]]
+}
+
+read_report_mif_as_magpie <- function(report_mif, target_vars_with_units = NULL) {
+  if (!file.exists(report_mif)) return(NULL)
+
+  mif_data <- read.csv(report_mif, sep = ";", stringsAsFactors = FALSE)
+  year_cols <- grep("^X?[0-9]{4}$", names(mif_data), value = TRUE)
+  if (length(year_cols) == 0) return(NULL)
+
+  mif_data$Region[mif_data$Region == "World"] <- "GLO"
+  mif_data <- mif_data[!is.na(mif_data$Variable) & !is.na(mif_data$Unit), , drop = FALSE]
+  if (nrow(mif_data) == 0) return(NULL)
+
+  if (!is.null(target_vars_with_units)) {
+    target_no_units <- unique(strip_units(target_vars_with_units))
+    mif_data <- mif_data[mif_data$Variable %in% target_no_units, , drop = FALSE]
+  }
+  if (nrow(mif_data) == 0) return(NULL)
+
+  years <- paste0("y", gsub("^X", "", year_cols))
+  regions <- sort(unique(mif_data$Region))
+  vars_with_units <- paste0(mif_data$Variable, " (", mif_data$Unit, ")")
+  unique_vars <- unique(vars_with_units)
+
+  out <- new.magpie(
+    cells_and_regions = regions,
+    years = years,
+    names = unique_vars,
+    fill = 0
+  )
+
+  for (i in seq_len(nrow(mif_data))) {
+    this_region <- mif_data$Region[i]
+    this_var <- paste0(mif_data$Variable[i], " (", mif_data$Unit[i], ")")
+    vals <- suppressWarnings(as.numeric(mif_data[i, year_cols]))
+    vals[is.na(vals)] <- 0
+    out[this_region, years, this_var] <- vals
+  }
+
+  out
+}
+
 # Loop over BE prices
 for (be_idx in seq_along(be_price_values)) {
   be <- be_price_values[be_idx]
@@ -285,11 +317,11 @@ for (be_idx in seq_along(be_price_values)) {
     
     # Construct run folder name: SSP2_BD00_BE{xx}_G{yyyy}demand_rev1
     run_folder <- paste0(scenario_name, "_BE", be_str, "_G", ghg_str, run_suffix_demand)
+    scenario_id <- build_scenario_id(be, ghg)
     
-    # GDX file path
-    gdx <- file.path(base_output_dir, run_folder, "fulldata.gdx")
-    bii_path <- file.path(base_output_dir, run_folder)
+    # Run paths
     gdx_check <- file.path(base_output_dir, run_folder, check_file)
+    report_mif <- file.path(base_output_dir, run_folder, "report.mif")
     lock_file <- file.path(base_output_dir, run_folder, ".lock")
     
     # Output file names (individual raw and map files per scenario)
@@ -300,6 +332,28 @@ for (be_idx in seq_along(be_price_values)) {
     # Raw files are in scenario-specific subfolder (e.g. SSP2_BD-none/)
     of_raw <- file.path(matrix_output_dir, paste0(scenario_name, "_BE", be_str, "_GHG", str_pad(ghg, 3, pad = "0"), "raw.csv"))
     of_map <- file.path(matrix_output_dir, paste0(scenario_name, "_BE", be_str, "_GHG", str_pad(ghg, 3, pad = "0"), "map.csv"))
+
+    status_idx <- which(scenario_status$scenario_id == scenario_id)
+    if (length(status_idx) == 1) {
+      scenario_status$run_folder[status_idx] <- run_folder
+      scenario_status$report_mif_exists[status_idx] <- file.exists(report_mif)
+    }
+
+    if (rerun_missing_only && length(rerun_targets) == 0) {
+      if (length(status_idx) == 1) {
+        scenario_status$skipped_by_rerun_filter[status_idx] <- TRUE
+        scenario_status$missing_reason[status_idx] <- "no_rerun_targets"
+      }
+      next
+    }
+
+    if (rerun_missing_only && length(rerun_targets) > 0 && !(scenario_id %in% rerun_targets)) {
+      if (length(status_idx) == 1) {
+        scenario_status$skipped_by_rerun_filter[status_idx] <- TRUE
+        scenario_status$missing_reason[status_idx] <- "skipped_by_rerun_filter"
+      }
+      next
+    }
     
     ### Read run data (raw phase)
     if ("raw" %in% phases) {
@@ -328,384 +382,106 @@ for (be_idx in seq_along(be_price_values)) {
       
       if (
         raw_file_needs_regeneration && file.exists(gdx_check) &&
-        file.exists(gdx) && file.size(gdx_check) > 3000000 &&
+        file.exists(report_mif) && file.size(gdx_check) > 3000000 &&
         !file.exists(lock_file)) {
 
         file.create(lock_file)
         loop_wait <- 0
 
-        message("Start report gdx= ", run_folder, "...")
-        a <- mbind(getReportMESSAGE(gdx, bii_path = bii_path, baseyear = baseyear))
-        
-        # Read emissions from report.mif instead of using reportEmissions() output
-        # (reportEmissions() returns zeros due to lowpass filter issues)
-        message("Reading emissions from report.mif file...")
-        report_mif <- file.path(base_output_dir, run_folder, "report.mif")
-        if (file.exists(report_mif)) {
-          # Read report.mif as CSV to get actual values (read.report() has issues)
-          mif_data <- read.csv(report_mif, sep = ";", stringsAsFactors = FALSE)
-          
-          # Get list of emissions variables from mapping file
-          mapping <- read.csv(map_file, sep = ";", stringsAsFactors = FALSE)
-          emissions_vars_with_units <- unique(mapping$piam_variable[grepl("^Emissions", mapping$piam_variable, ignore.case = TRUE)])
-          emissions_vars_with_units <- emissions_vars_with_units[!grepl("^ZERO", emissions_vars_with_units, ignore.case = TRUE)]
-          
-          # Strip units from mapping variable names for matching (report.mif has units in separate column)
-          strip_units_from_var <- function(var_name) {
-            gsub("\\s*\\([^)]*\\)$", "", var_name)
+        message("Start report.mif extraction: ", run_folder, "...")
+        mapping <- read.csv(map_file, sep = ";", stringsAsFactors = FALSE)
+        mapping_magpie_vars_with_units <- unique(mapping$piam_variable)
+        mapping_magpie_vars_with_units <- mapping_magpie_vars_with_units[!grepl("^ZERO", mapping_magpie_vars_with_units, ignore.case = TRUE)]
+        a <- read_report_mif_as_magpie(report_mif, mapping_magpie_vars_with_units)
+        if (is.null(a)) {
+          warning("Could not build raw magpie object from report.mif for ", run_folder)
+          if (file.exists(lock_file)) file.remove(lock_file)
+          if (length(status_idx) == 1 && scenario_status$missing_reason[status_idx] == "") {
+            scenario_status$missing_reason[status_idx] <- "report.mif_unreadable_or_empty"
           }
-          emissions_vars <- strip_units_from_var(emissions_vars_with_units)
-          
-          # Extract emissions data from report.mif (match variable names without units)
-          emissions_data <- mif_data[mif_data$Variable %in% emissions_vars, ]
-          
-          if (nrow(emissions_data) > 0) {
-            # Get year columns
-            year_cols <- grep("^X?[0-9]{4}$", names(emissions_data), value = TRUE)
-            year_names <- gsub("^X", "", year_cols)
-            
-            # Create magpie object using as.magpie (more efficient)
-            # First, reshape data: Region x Variable x Year
-            regions_mif <- unique(emissions_data$Region)
-            # Convert "World" to "GLO" to match getReportMESSAGE() output
-            emissions_data$Region[emissions_data$Region == "World"] <- "GLO"
-            regions <- unique(emissions_data$Region)
-            
-            # Add units to variable names to match format expected by mapping
-            vars_with_units <- paste0(emissions_data$Variable, " (", emissions_data$Unit, ")")
-            unique_vars <- unique(vars_with_units)
-            
-            # Get regions and years from existing object 'a' to ensure compatibility
-            a_regions <- getRegions(a)
-            a_years <- getYears(a)
-            
-            # Create empty magpie object with same structure as 'a'
-            emissions_magpie <- new.magpie(
-              cells_and_regions = a_regions,
-              years = a_years,
-              names = unique_vars,
-              fill = 0
-            )
-            
-            # Fill in values (only for regions that exist in emissions_data)
-            for (i in 1:nrow(emissions_data)) {
-              var_with_unit <- vars_with_units[i]
-              region <- emissions_data$Region[i]
-              if (region %in% a_regions) {
-                values <- as.numeric(emissions_data[i, year_cols])
-                # Handle N/A values
-                values[is.na(values)] <- 0
-                # Match years
-                year_indices <- match(paste0("y", year_names), a_years)
-                valid_years <- !is.na(year_indices)
-                if (any(valid_years)) {
-                  emissions_magpie[region, a_years[year_indices[valid_years]], var_with_unit] <- values[valid_years]
-                }
-              }
-            }
-            
-            # Remove emissions variables from getReportMESSAGE() output
-            # Try to get variable names - handle different magpie object structures
-            tryCatch({
-              a_vars <- getNames(a, dim = "variable")
-            }, error = function(e) {
-              # If that fails, try getting all names
-              a_vars <<- getNames(a)
-            })
-            emissions_in_a <- a_vars[grepl("^Emissions", a_vars, ignore.case = TRUE)]
-            if (length(emissions_in_a) > 0) {
-              a <- a[, , emissions_in_a, invert = TRUE]
-              message("Removed ", length(emissions_in_a), " emissions variables from getReportMESSAGE() output")
-            }
-            
-            # Add emissions from report.mif
-            a <- mbind(a, emissions_magpie)
-            message("Added ", length(unique_vars), " emissions variables from report.mif")
-            
-            # Create aggregated Emissions|GHG|AFOLU variable
-            # Get base emissions variables
-            co2_var <- "Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr)"
-            ch4_var <- "Emissions|CH4|Land (Mt CH4/yr)"
-            n2o_var <- "Emissions|N2O|Land (Mt N2O/yr)"
-            
-            if (co2_var %in% getNames(emissions_magpie) && 
-                ch4_var %in% getNames(emissions_magpie) && 
-                n2o_var %in% getNames(emissions_magpie)) {
-              
-              co2_data <- emissions_magpie[, , co2_var] * 1      # factor = 1
-              ch4_data <- emissions_magpie[, , ch4_var] * 25     # factor = 25
-              n2o_data <- emissions_magpie[, , n2o_var] * 0.285  # factor = 0.285
-              
-              # Aggregate: CO2 + CH4 + N2O (all in Mt CO2e/yr)
-              ghg_afolu <- co2_data + ch4_data + n2o_data
-              getNames(ghg_afolu) <- "Emissions|GHG|AFOLU (Mt CO2e/yr)"
-              
-              # Add to output
-              a <- mbind(a, ghg_afolu)
-              message("Created aggregated Emissions|GHG|AFOLU variable")
-            } else {
-              missing <- c()
-              if (!co2_var %in% getNames(emissions_magpie)) missing <- c(missing, "CO2")
-              if (!ch4_var %in% getNames(emissions_magpie)) missing <- c(missing, "CH4")
-              if (!n2o_var %in% getNames(emissions_magpie)) missing <- c(missing, "N2O")
-              warning("Could not create Emissions|GHG|AFOLU: missing variables: ", paste(missing, collapse=", "))
-            }
-          } else {
-            warning("No emissions data found in report.mif for variables in mapping file")
+          next
+        }
+
+        # Build AFOLU aggregate if not already present but components exist in report.mif output.
+        vars_in_a <- magpie_data_names(a)
+        if (!("Emissions|GHG|AFOLU (Mt CO2e/yr)" %in% vars_in_a)) {
+          co2_candidates <- vars_in_a[strip_units(vars_in_a) == "Emissions|CO2|Land|+|Land-use Change"]
+          ch4_candidates <- vars_in_a[strip_units(vars_in_a) == "Emissions|CH4|Land"]
+          n2o_candidates <- vars_in_a[strip_units(vars_in_a) == "Emissions|N2O|Land"]
+          if (length(co2_candidates) > 0 && length(ch4_candidates) > 0 && length(n2o_candidates) > 0) {
+            ghg_afolu <- a[, , co2_candidates[1]] + (a[, , ch4_candidates[1]] * 25) + (a[, , n2o_candidates[1]] * 0.285)
+            getNames(ghg_afolu) <- "Emissions|GHG|AFOLU (Mt CO2e/yr)"
+            a <- mbind(a, ghg_afolu)
+            message("Created aggregated Emissions|GHG|AFOLU variable from report.mif emissions")
           }
-        } else {
-          warning("report.mif file not found, using emissions from getReportMESSAGE() (may be zeros)")
         }
 
         if (correct_emissions) {
-          ### get emissions pre correction
-          # Note: In new format, units are in separate column, so variable names don't include units
-          lu_ch4 <- a[, , "Emissions|CH4|Land"]
-          lu_co2 <- a[, , "Emissions|CO2|Land"]
-          lu_n2o <- a[, , "Emissions|N2O|Land"]
-
-          ### correct emissions trajectories on regional level
-
-          lu_ch4_cor <- lu_ch4["GLO", , , invert = TRUE]
-          lu_co2_cor <- lu_co2["GLO", , , invert = TRUE]
-          lu_n2o_cor <- lu_n2o["GLO", , , invert = TRUE]
-
-          if (ghg_idx > 1) {
-              lu_ch4_cor <- flatten_the_curve(lu_ch4_cor, lu_ch4_up)
-              lu_co2_cor <- flatten_the_curve(lu_co2_cor, lu_co2_up)
-              lu_n2o_cor <- flatten_the_curve(lu_n2o_cor, lu_n2o_up)
-          }
-          # upper bounds for next GHG price category
-          lu_ch4_up <- lu_ch4_cor
-          lu_co2_up <- lu_co2_cor
-          lu_n2o_up <- lu_n2o_cor
-
-          ### re-calculate global level
-          lu_ch4_cor <- sum_glo(lu_ch4_cor)
-          lu_co2_cor <- sum_glo(lu_co2_cor)
-          lu_n2o_cor <- sum_glo(lu_n2o_cor)
-
-          ### adjust subcategories
-          n <- getNames(a[, , "Emissions|CH4|Land|", pmatch = TRUE])
-          lu_ch4_sub <- a[, , n] * lu_ch4_cor / lu_ch4
-          lu_ch4_sub <- setNames(collapseDim(lu_ch4_sub), n)
-
-          n <- getNames(
-              a[, , "Emissions|CO2|Land|",
-              pmatch = TRUE
-              ]
-          )
-          lu_co2_sub <- a[, , n] * lu_co2_cor / lu_co2
-          lu_co2_sub <- setNames(collapseDim(lu_co2_sub), n)
-
-          n <- getNames(a[, , "Emissions|N2O|Land|", pmatch = TRUE])
-          lu_n2o_sub <- a[, , n] * lu_n2o_cor / lu_n2o
-          lu_n2o_sub <- setNames(collapseDim(lu_n2o_sub), n)
-
-          lu_emis_cor <- mbind(
-              lu_ch4_cor,
-              lu_co2_cor,
-              lu_n2o_cor,
-              lu_ch4_sub,
-              lu_co2_sub,
-              lu_n2o_sub
-          )
-
-          a <- a[, , getNames(lu_emis_cor), invert = TRUE]
-          a <- mbind(a, lu_emis_cor)
-        }
-
-        ### Price
-        regions <- getRegions(a["GLO", , , invert = TRUE])
-        years <- getYears(a)
-
-        # bioenergy prices from price-driven run
-        if (be != 0) {
-          price_run_folder <- paste0(scenario_name, "_BE", be_str, "_", run_suffix_price)
-          price_gdx <- file.path(base_output_dir, price_run_folder, "fulldata.gdx")
-          
-          price_bio <- readGDX(
-              price_gdx,
-              "i60_2ndgen_bioenergy_subsidy", react = "silent"
-          )[, years, ]
-          price_bio <- add_columns(
-              price_bio,
-              addnm = regions,
-              dim = 1,
-              fill = NA
-          )
-          price_bio[, , ] <- price_bio["GLO", , ]
-          # Updated unit: US$2017 instead of US$05
-          getNames(price_bio) <- "Prices|Bioenergy"
-        }
-
-        # emissions prices
-        price_emis_co2 <- readGDX(
-          gdx, "p56_pollutant_prices_input",
-          react = "silent")[, years, "co2_c.peatland"] / 44 * 12
-        price_emis_co2 <- add_columns(
-          price_emis_co2, addnm = "GLO", dim = 1, fill = NA
-        )
-        price_emis_co2[, , ] <- price_emis_co2["LAM", , ]
-        # Updated unit: US$2017 instead of US$2005
-        getNames(price_emis_co2) <- "Prices|GHG Emission|CO2"
-
-        if (be != 0) { prices <- mbind(price_bio, price_emis_co2) }
-        else { prices <- price_emis_co2 }
-
-        a <- a[, , getNames(prices), invert = TRUE]
-        a <- mbind(a, prices)
-
-
-        ### MP split (if needed - adjust based on your requirements)
-        # Note: This section may need adjustment based on your new structure
-        # For now, keeping the structure but you may need to adapt it
-        # Load a reduced reporting (food demand only) from a baseline run
-        # Baseline run folder (assuming BE=0, same GHG price)
-        baseline_run_folder <- paste0(scenario_name, "_BE00_G", ghg_str, run_suffix_demand)
-        baseline_gdx <- file.path(base_output_dir, baseline_run_folder, "fulldata.gdx")
-        
-        if (file.exists(baseline_gdx)) {
-          f <- mbind(getReportMESSAGE(baseline_gdx, food_only = TRUE, baseyear = baseyear))
-
-          # Get Delta between baseline and current for beef and dairy
-          # Updated variable names: units removed
-          d <- "Demand|Food|Livestock products|+|Ruminant meat"
-          if (d %in% getNames(a, fulldim = TRUE)$variable) {
-            beef_base <- f[,,d]
-            beef <- a[,,d]
-            beef_delta <- beef_base - beef
-            getNames(beef_base) <- "Demand|Food|Livestock products|Ruminant meat|Baseline"
-            getNames(beef_delta) <- "Demand|Food|Livestock products|Ruminant meat|Replaced"
-
-            d <- "Demand|Food|Livestock products|+|Dairy"
-            dairy_base <- f[,,d]
-            dairy <- a[,,d]
-            dairy_delta <- dairy_base - dairy
-            getNames(dairy_base) <- "Demand|Food|Livestock products|Dairy|Baseline"
-            getNames(dairy_delta) <- "Demand|Food|Livestock products|Dairy|Replaced"
-
-            # Get protein content of beef, dairy, MP
-            prot_beef <- readGDX(gdx, "f15_nutrition_attributes",
-              react = "silent")[, years, "livst_rum.protein"]
-            prot_dairy <- readGDX(gdx, "f15_nutrition_attributes",
-              react = "silent")[, years, "livst_milk.protein"]
-            prot_MP <- readGDX(gdx, "f15_nutrition_attributes",
-              react = "silent")[, years, "scp.protein"]
-
-            # Multiply by delta and MP tonnage respectively
-            # Get share of delta protein of total MP Protein
-            # Share (beef, dairy protein) * MP tonnage = tonnage MP (beef, dairy)
-            beef_mp  <- beef_delta  * prot_beef  / prot_MP 
-            dairy_mp <- dairy_delta * prot_dairy / prot_MP
-
-            # Rename magpie objects (units removed)
-            getNames(beef_mp) <- "Demand|Food|Secondary products|Microbial protein|+|Ruminant meat"
-            getNames(dairy_mp) <- "Demand|Food|Secondary products|Microbial protein|+|Dairy"
-
-            a <- mbind(a, beef_base, dairy_base, beef_delta, dairy_delta, beef_mp, dairy_mp)
-          }
-        }
-
-        # Read missing MAgPIE variables from report.mif (extending emissions logic to all variables)
-        # Check which MAgPIE variables from mapping file are missing after getReportMESSAGE() and emissions handling
-        message("Checking for missing MAgPIE variables from mapping file...")
-        if (file.exists(report_mif)) {
-          # Read mapping file to get all MAgPIE-side variables
-          mapping <- read.csv(map_file, sep = ";", stringsAsFactors = FALSE)
-          # Get all unique MAgPIE variables from mapping (excluding ZERO entries)
-          mapping_magpie_vars_with_units <- unique(mapping$piam_variable)
-          mapping_magpie_vars_with_units <- mapping_magpie_vars_with_units[!grepl("^ZERO", mapping_magpie_vars_with_units, ignore.case = TRUE)]
-          
-          # Get variables currently in 'a' (after getReportMESSAGE and emissions handling)
-          # Handle different magpie object structures
-          tryCatch({
-            a_vars <- getNames(a, dim = "variable")
-          }, error = function(e) {
-            # If that fails, try getting all names and extract variable dimension
-            all_names <- getNames(a, fulldim = TRUE)
-            if ("variable" %in% names(all_names)) {
-              a_vars <- all_names$variable
-            } else {
-              # Last resort: get all names and assume they're variable names
-              a_vars <- getNames(a)
-            }
-          })
-          
-          # Strip units for comparison
-          strip_units_from_var <- function(var_name) {
-            gsub("\\s*\\([^)]*\\)$", "", var_name)
-          }
-          mapping_vars_no_units <- strip_units_from_var(mapping_magpie_vars_with_units)
-          a_vars_no_units <- strip_units_from_var(a_vars)
-          
-          # Find missing variables (in mapping but not in 'a')
-          missing_vars_no_units <- mapping_vars_no_units[!mapping_vars_no_units %in% a_vars_no_units]
-          
-          if (length(missing_vars_no_units) > 0) {
-            message("Found ", length(missing_vars_no_units), " missing MAgPIE variables. Reading from report.mif...")
-            
-            # Read report.mif if not already read (for emissions)
-            if (!exists("mif_data") || is.null(mif_data)) {
-              mif_data <- read.csv(report_mif, sep = ";", stringsAsFactors = FALSE)
-            }
-            
-            # Extract missing variables from report.mif (match variable names without units)
-            missing_data <- mif_data[mif_data$Variable %in% missing_vars_no_units, ]
-            
-            if (nrow(missing_data) > 0) {
-              # Get year columns
-              year_cols <- grep("^X?[0-9]{4}$", names(missing_data), value = TRUE)
-              year_names <- gsub("^X", "", year_cols)
-              
-              # Convert "World" to "GLO" to match getReportMESSAGE() output
-              missing_data$Region[missing_data$Region == "World"] <- "GLO"
-              
-              # Get regions and years from existing object 'a' to ensure compatibility
-              a_regions <- getRegions(a)
-              a_years <- getYears(a)
-              
-              # Add units to variable names to match format expected by mapping
-              vars_with_units <- paste0(missing_data$Variable, " (", missing_data$Unit, ")")
-              unique_vars <- unique(vars_with_units)
-              
-              # Create empty magpie object with same structure as 'a'
-              missing_magpie <- new.magpie(
-                cells_and_regions = a_regions,
-                years = a_years,
-                names = unique_vars,
-                fill = 0
-              )
-              
-              # Fill in values
-              for (i in 1:nrow(missing_data)) {
-                var_with_unit <- vars_with_units[i]
-                region <- missing_data$Region[i]
-                if (region %in% a_regions) {
-                  values <- as.numeric(missing_data[i, year_cols])
-                  # Handle N/A values
-                  values[is.na(values)] <- 0
-                  # Match years
-                  year_indices <- match(paste0("y", year_names), a_years)
-                  valid_years <- !is.na(year_indices)
-                  if (any(valid_years)) {
-                    missing_magpie[region, a_years[year_indices[valid_years]], var_with_unit] <- values[valid_years]
-                  }
-                }
-              }
-              
-              # Add missing variables to output
-              a <- mbind(a, missing_magpie)
-              message("Added ", length(unique_vars), " missing variables from report.mif")
-            } else {
-              message("No data found in report.mif for ", length(missing_vars_no_units), " missing variables")
-            }
+          ### get emissions pre correction (resolve names with units from report.mif)
+          nm_ch4 <- magpie_first_name_matching(a, "Emissions|CH4|Land")
+          nm_co2 <- magpie_first_name_matching(a, "Emissions|CO2|Land")
+          nm_n2o <- magpie_first_name_matching(a, "Emissions|N2O|Land")
+          if (is.na(nm_ch4) || is.na(nm_co2) || is.na(nm_n2o)) {
+            warning(run_folder, ": correct_emissions skipped (missing CH4/CO2/N2O Land aggregate in raw data)")
           } else {
-            message("All MAgPIE variables from mapping file are present in raw data")
+            lu_ch4 <- a[, , nm_ch4]
+            lu_co2 <- a[, , nm_co2]
+            lu_n2o <- a[, , nm_n2o]
+
+            ### correct emissions trajectories on regional level
+
+            lu_ch4_cor <- lu_ch4["GLO", , , invert = TRUE]
+            lu_co2_cor <- lu_co2["GLO", , , invert = TRUE]
+            lu_n2o_cor <- lu_n2o["GLO", , , invert = TRUE]
+
+            if (ghg_idx > 1) {
+                lu_ch4_cor <- flatten_the_curve(lu_ch4_cor, lu_ch4_up)
+                lu_co2_cor <- flatten_the_curve(lu_co2_cor, lu_co2_up)
+                lu_n2o_cor <- flatten_the_curve(lu_n2o_cor, lu_n2o_up)
+            }
+            # upper bounds for next GHG price category
+            lu_ch4_up <- lu_ch4_cor
+            lu_co2_up <- lu_co2_cor
+            lu_n2o_up <- lu_n2o_cor
+
+            ### re-calculate global level
+            lu_ch4_cor <- sum_glo(lu_ch4_cor)
+            lu_co2_cor <- sum_glo(lu_co2_cor)
+            lu_n2o_cor <- sum_glo(lu_n2o_cor)
+
+            ### adjust subcategories (prefix match on stripped names)
+            all_nm <- magpie_data_names(a)
+            su_all <- strip_units(all_nm)
+            n_ch4 <- all_nm[startsWith(su_all, "Emissions|CH4|Land|")]
+            n_co2 <- all_nm[startsWith(su_all, "Emissions|CO2|Land|")]
+            n_n2o <- all_nm[startsWith(su_all, "Emissions|N2O|Land|")]
+
+            emis_parts <- list(lu_ch4_cor, lu_co2_cor, lu_n2o_cor)
+            if (length(n_ch4) > 0) {
+              lu_ch4_sub <- a[, , n_ch4] * lu_ch4_cor / lu_ch4
+              lu_ch4_sub <- setNames(collapseDim(lu_ch4_sub), n_ch4)
+              emis_parts <- c(emis_parts, list(lu_ch4_sub))
+            }
+            if (length(n_co2) > 0) {
+              lu_co2_sub <- a[, , n_co2] * lu_co2_cor / lu_co2
+              lu_co2_sub <- setNames(collapseDim(lu_co2_sub), n_co2)
+              emis_parts <- c(emis_parts, list(lu_co2_sub))
+            }
+            if (length(n_n2o) > 0) {
+              lu_n2o_sub <- a[, , n_n2o] * lu_n2o_cor / lu_n2o
+              lu_n2o_sub <- setNames(collapseDim(lu_n2o_sub), n_n2o)
+              emis_parts <- c(emis_parts, list(lu_n2o_sub))
+            }
+
+            lu_emis_cor <- do.call(mbind, emis_parts)
+
+            a <- a[, , magpie_data_names(lu_emis_cor), invert = TRUE]
+            a <- mbind(a, lu_emis_cor)
           }
-        } else {
-          warning("report.mif file not found, cannot read missing variables")
         }
+
+        # report.mif is now the primary raw-stage source. Keep optional emissions correction
+        # as-is, but skip legacy GDX-based enrichment steps in this moderate refactor.
 
         ### Add Filler Zero object for mapping
         z <- new.magpie(
@@ -725,6 +501,9 @@ for (be_idx in seq_along(be_price_values)) {
             skipempty = FALSE
         )
         print("raw written")
+        if (length(status_idx) == 1 && file.exists(of_raw)) {
+          scenario_status$raw_exists[status_idx] <- TRUE
+        }
         file.remove(lock_file)
       } else if (file.exists(of_raw) && !file.exists(lock_file)) {
         # Check if raw file needs missing variables from report.mif
@@ -736,7 +515,7 @@ for (be_idx in seq_along(be_price_values)) {
         if (file.exists(report_mif)) {
           # Read existing raw file
           a_existing <- read.report(of_raw, as.list = FALSE)
-          a_existing_vars <- getNames(a_existing, dim = "variable")
+          a_existing_vars <- magpie_data_names(a_existing)
           
           # Read mapping file to get all MAgPIE-side variables
           mapping <- read.csv(map_file, sep = ";", stringsAsFactors = FALSE)
@@ -832,16 +611,31 @@ for (be_idx in seq_along(be_price_values)) {
         if (file.exists(lock_file)) {
           file.remove(lock_file)
         }
+        if (length(status_idx) == 1 && file.exists(of_raw)) {
+          scenario_status$raw_exists[status_idx] <- TRUE
+        }
       } else if (file.exists(lock_file)) {
           message(run_folder, ": folder locked by other script. Skipped")
+          if (length(status_idx) == 1 && scenario_status$missing_reason[status_idx] == "") {
+            scenario_status$missing_reason[status_idx] <- "run_locked"
+          }
       } else {
         message(
           run_folder, ": run not started, reporting not finished yet, or infeasible, check log. Skipped."
         )
-        message("Fulldata exists: ", file.exists(gdx),
+        message("report.mif exists: ", file.exists(report_mif),
         "; reporting finished: ", file.exists(gdx_check))
         if (file.exists(gdx_check)) {
           message(gdx_check, " size: ", file.size(gdx_check) / 1024, " kb")
+        }
+        if (length(status_idx) == 1 && scenario_status$missing_reason[status_idx] == "") {
+          if (!file.exists(report_mif)) {
+            scenario_status$missing_reason[status_idx] <- "report.mif_missing"
+          } else if (!file.exists(gdx_check)) {
+            scenario_status$missing_reason[status_idx] <- paste0(check_file, "_missing")
+          } else {
+            scenario_status$missing_reason[status_idx] <- "raw_not_generated"
+          }
         }
       }
     } else { # end raw phase
@@ -874,8 +668,7 @@ for (be_idx in seq_along(be_price_values)) {
         
         # Preserve unmapped variables that exist in raw files and are in old matrix
         # Get variable names from raw and mapped data
-        raw_vars <- getNames(a_raw, dim = "variable")
-        mapped_vars <- getNames(a, dim = "variable")
+        raw_vars <- magpie_data_names(a_raw)
         
         # Read mapping file to check which raw variables were mapped
         mapping <- read.csv(map_file, sep = ";", stringsAsFactors = FALSE)
@@ -905,7 +698,7 @@ for (be_idx in seq_along(be_price_values)) {
         
         # Filter to only keep variables from vars_to_keep list
         # Get variable names from mapped data (with units from read.report)
-        all_vars <- getNames(a, dim = "variable")
+        all_vars <- magpie_data_names(a)
         all_vars_stripped <- strip_units(all_vars)
         vars_to_keep_stripped <- strip_units(vars_to_keep)
         
@@ -950,9 +743,16 @@ for (be_idx in seq_along(be_price_values)) {
             skipempty = FALSE,
             extracols = c("SSPscen", "GHGscen", "BIOscen", "SDGscen")
         )
+        if (length(status_idx) == 1) {
+          scenario_status$map_exists[status_idx] <- file.exists(of_map)
+          scenario_status$premap_written[status_idx] <- TRUE
+        }
 
       } else {
         message(of_raw, " does not exist. Skipped")
+        if (length(status_idx) == 1 && scenario_status$missing_reason[status_idx] == "") {
+          scenario_status$missing_reason[status_idx] <- "raw_missing_for_map"
+        }
       }
     } #end map phase
 
@@ -1110,10 +910,82 @@ if ("matrix" %in% phases && !loop) {
         row.names = FALSE,
         quote = c(1, 2, 3, 4, 5, 6, 7)
     )
+    append_matrix_user_log(
+      "Final matrix written: ", nrow(a), " rows; file.size=",
+      file.size(matrix_file), " bytes; path=", matrix_file,
+      also_message = FALSE
+    )
   } else {
     message("Premap file ", ofile, " does not exist. Matrix phase skipped.")
+    append_matrix_user_log(
+      "Matrix phase skipped: premap file does not exist: ", ofile,
+      also_message = FALSE
+    )
   }
 } # end matrix phase
+
+# End-of-run non-blocking completeness summary for scenario combinations.
+if (!loop) {
+  if ("raw" %in% phases) {
+    scenario_status$raw_exists <- file.exists(file.path(
+      matrix_output_dir,
+      paste0(scenario_name, "_BE", str_pad(scenario_status$be, 2, pad = "0"), "_GHG", str_pad(scenario_status$ghg, 3, pad = "0"), "raw.csv")
+    ))
+  }
+  if ("map" %in% phases || "matrix" %in% phases) {
+    scenario_status$map_exists <- file.exists(file.path(
+      matrix_output_dir,
+      paste0(scenario_name, "_BE", str_pad(scenario_status$be, 2, pad = "0"), "_GHG", str_pad(scenario_status$ghg, 3, pad = "0"), "map.csv")
+    ))
+  }
+
+  scenario_status$missing_any <- FALSE
+  if ("raw" %in% phases) {
+    scenario_status$missing_any <- scenario_status$missing_any | !scenario_status$raw_exists | !scenario_status$report_mif_exists
+  }
+  if ("map" %in% phases || "matrix" %in% phases) {
+    scenario_status$missing_any <- scenario_status$missing_any | !scenario_status$map_exists
+  }
+  scenario_status$missing_any <- scenario_status$missing_any & !scenario_status$skipped_by_rerun_filter
+
+  missing_rows <- scenario_status[scenario_status$missing_any, c(
+    "scenario_id", "be", "ghg", "run_folder",
+    "report_mif_exists", "raw_exists", "map_exists", "missing_reason"
+  )]
+  write.csv(missing_rows, missing_report_file, row.names = FALSE)
+
+  if (nrow(missing_rows) > 0) {
+    message("Missing scenario combinations detected: ", nrow(missing_rows))
+    message("Examples: ", paste(head(missing_rows$scenario_id, 10), collapse = ", "))
+    message("Missing-scenario report written to: ", missing_report_file)
+    append_matrix_user_log(
+      "MISSING SCENARIOS: ", nrow(missing_rows),
+      " combination(s) incomplete for selected phases. Full scenario_id list: ",
+      paste(missing_rows$scenario_id, collapse = ", "),
+      also_message = TRUE
+    )
+    append_matrix_user_log(
+      paste(capture.output(print(missing_rows, row.names = FALSE, width = 200)), collapse = "\n"),
+      also_message = FALSE
+    )
+  } else {
+    message("No missing scenario combinations detected for selected phases.")
+    message("Missing-scenario report written to: ", missing_report_file, " (empty)")
+    append_matrix_user_log(
+      "No missing scenario combinations for selected phases (detail CSV may be empty).",
+      also_message = TRUE
+    )
+  }
+  append_matrix_user_log(
+    "Machine-readable missing report: ", missing_report_file,
+    also_message = FALSE
+  )
+  append_matrix_user_log(
+    "Finished (Europe/Vienna): ",
+    format(Sys.time(), "%Y-%m-%d %H:%M:%S %z", tz = "Europe/Vienna"),
+    also_message = FALSE
+  )
+}
 
 if (loop && (loop_wait < 30)) {
   message("Loop ended without new raw file. Waiting ", loop_wait, " minutes")

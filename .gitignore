@@ -1,0 +1,12 @@
+# Local Python deps (e.g. openpyxl --target)
+.pydeps/
+__pycache__/
+*.pyc
+
+# Mapping work-in-progress / large references (not part of default repo contents for now)
+emulator_mapping_NAVIGATE.xlsx
+mapping_AR6.csv
+2026-04-16_piam_mapping_candidate_review.csv
+
+.Rhistory
+.RData
