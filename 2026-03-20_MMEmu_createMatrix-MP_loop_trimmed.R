@@ -11,8 +11,8 @@ library(hash)
 # ===== User input (adjust as needed) =====
 # BD scenario: "none" or "high"
 # Can be overridden by passing it as a command-line argument:
-#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R none
-#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R high
+#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R none
+#   Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R high
 args <- commandArgs(trailingOnly = TRUE)
 bd_scenario <- if (length(args) >= 1 && args[1] %in% c("none", "high")) args[1] else "none"
 message("BD scenario: ", bd_scenario)

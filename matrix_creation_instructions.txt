@@ -25,7 +25,7 @@ Below, we briefly describe each file and what it does.
 
 ***************************************************************************
 
-(I) "2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R"
+(I) "2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
 
 This is the main matrix generation script. It processes MAgPIE outputs into a matrix ready for
 MESSAGE. There are 3 stages: "raw", "map", and "matrix". These are described briefly below:
@@ -58,8 +58,8 @@ Other settings (paths, phases default, check_file, etc.) are in the script heade
 for MAgPIE output location and mapping paths.
 
 The script is designed to be run in parallel using the master bash script (file IV below):
-  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R none  # BD-none scenario
-  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R high  # BD-high scenario
+  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R none  # BD-none scenario
+  Rscript 2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R high  # BD-high scenario
 
 ***************************************************************************
 

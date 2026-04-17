@@ -3,7 +3,7 @@
 # Master pipeline: generate matrices for BD-none and BD-high
 #
 # Runs the full pipeline sequentially for both BD scenarios:
-#   1. raw + map + matrix phases  (2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R)
+#   1. raw + map + matrix phases  (2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R)
 #   2. add bioenergy prices        (2026-03-20_add_bioenergy_prices.R)
 #   3. add woodfuel to bioenergy   (2026-04-09_add_woodfuel_to_bioenergy.R)
 #
@@ -21,7 +21,7 @@
 set -euo pipefail
 
 SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
-LOOP_SCRIPT="$SCRIPT_DIR/2026-03-20_MMEmu_createMatrix-MP_loop_trimmed_2.R"
+LOOP_SCRIPT="$SCRIPT_DIR/2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
 POST_SCRIPT="$SCRIPT_DIR/2026-03-20_add_bioenergy_prices.R"
 WOOD_SCRIPT="$SCRIPT_DIR/2026-04-09_add_woodfuel_to_bioenergy.R"
 LOG_DIR="$SCRIPT_DIR/output/logs"
