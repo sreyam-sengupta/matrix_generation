@@ -1,0 +1,49 @@
+piam_variable;Variable;factor;weight;spatial
+Resources|Nitrogen|Cropland Budget|Inputs|+|Fertilizer (Mt Nr/yr);Fertilizer Use|Nitrogen (Tg N/yr);1;NULL;reg+glo
+Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr);Emissions|CO2|AFOLU (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr);Emissions|CO2|AFOLU|Land (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|Land-use Change|+|Regrowth (Mt CO2/yr);Emissions|CO2|AFOLU|Land|Negative (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|Land-use Change|+|Peatland (Mt CO2/yr);Emissions|CO2|AFOLU|Land|Wetlands (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CH4|Land (Mt CH4/yr);Emissions|CH4|AFOLU (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|+|Agriculture (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Enteric fermentation (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Livestock (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Animal waste management (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Livestock (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Enteric fermentation (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Livestock|Enteric Fermentation (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Animal waste management (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Livestock|Manure Management (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Rice (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Rice (Mt CH4/yr);1;NULL;reg+glo
+ZERO (NA);Emissions|CH4|AFOLU|Land (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|+|Peatland (Mt CH4/yr);Emissions|CH4|AFOLU|Land|Wetlands (Mt CH4/yr);1;NULL;reg+glo
+Emissions|N2O|Land (Mt N2O/yr);Emissions|N2O|AFOLU (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|+|Agriculture (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|+|Animal Waste Management (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Livestock|Manure Management (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Decay of Crop Residues (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Managed Soils (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Inorganic Fertilizers (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Managed Soils (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Manure applied to Croplands (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Managed Soils (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Pasture (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Managed Soils (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Soil Organic Matter Loss (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Managed Soils (kt N2O/yr);1000;NULL;reg+glo
+ZERO (NA);Emissions|N2O|AFOLU|Land (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|+|Peatland (Mt N2O/yr);Emissions|N2O|AFOLU|Land|Wetlands (kt N2O/yr);1000;NULL;reg+glo
+SDG|SDG02|Prevalence of underweight (million);Population|Risk of Hunger (million);1;NULL;reg+glo
+Resources|Land Cover (million ha);Land Cover (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Urban Area (million ha);Land Cover|Built-up Area (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Cropland (million ha);Land Cover|Cropland (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Forest (million ha);Land Cover|Forest (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Pastures and Rangelands (million ha);Land Cover|Pasture (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|Crops|+|Cereals (million ha);Land Cover|Cropland|Cereals (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|+|Bioenergy crops (million ha);Land Cover|Cropland|Energy Crops (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|Bioenergy crops|++|irrigated (million ha);Land Cover|Cropland|Energy Crops|Irrigated (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|Crops|++|irrigated (million ha);Land Cover|Cropland|Irrigated (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|Forage|++|irrigated (million ha);Land Cover|Cropland|Irrigated (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|Bioenergy crops|++|irrigated (million ha);Land Cover|Cropland|Irrigated (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Natural|+|NPI_NDC AR (million ha);Land Cover|Forest|Afforestation and Reforestation (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Natural|+|CO2-price AR (million ha);Land Cover|Forest|Afforestation and Reforestation (million ha);1;NULL;reg+glo
+ZERO (NA);Land Cover|Forest|Forestry|Harvested Area (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Plantations|+|Timber (million ha);Land Cover|Forest|Managed (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Natural Forest|+|Primary Forest (million ha);Land Cover|Forest|Natural Forest (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Natural Forest|+|Secondary Forest (million ha);Land Cover|Forest|Natural Forest (million ha);1;NULL;reg+glo
+ZERO (NA);Land Cover|Other Arable Land (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Other Land (million ha);Land Cover|Other Land (million ha);1;NULL;reg+glo
+SDG|SDG15|Terrestrial biodiversity (index);Biodiversity|BII (unitless);1;NULL;reg+glo
+Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);1;NULL;reg+glo
+Emissions|CH4|Land (Mt CH4/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);25;NULL;reg+glo
+Emissions|N2O|Land (Mt N2O/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);0.285;NULL;reg+glo

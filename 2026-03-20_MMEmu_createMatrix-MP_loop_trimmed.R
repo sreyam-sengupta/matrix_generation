@@ -65,7 +65,7 @@ if (nzchar(matrix_output_root)) {
 matrix_output_dir <- file.path(matrix_output_root, scenario_name)
 
 # Full mapping file for MESSAGE (we'll filter output after mapping)
-map_file <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/2026-03-20_map_magpie_message_human_corrected.csv"
+map_file <- "/p/projects/magpie/users/sreyamse/running_output/matrix_creation_files/2026-04-20_new_trimmed_mapping.csv"
 
 # Variables to keep (MESSAGE variable names after accounting for name changes)
 vars_to_keep_file <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/2026-03-20_vars_to_keep.csv"

@@ -1,0 +1,17 @@
+"Emi" series;	Most likely match from report.mif
+Emi|CH4|+|Agriculture;	Emissions|CH4|Land|+|Agriculture
+Emi|CH4|+|Land-Use Change;	
+Emi|CH4|Agriculture|+|Animal waste management;	Emissions|CH4|Land|Agriculture|+|Animal waste management
+Emi|CH4|Agriculture|+|Enteric fermentation;	Emissions|CH4|Land|Agriculture|+|Enteric fermentation
+Emi|CH4|Agriculture|+|Rice;	Emissions|CH4|Land|Agriculture|+|Rice
+Emi|CH4|Agriculture|+|Waste Burning;
+Emi|CO2|+|Land-Use Change;	Emissions|CO2|Land|+|Land-use Change
+Emi|N2O|+|Agriculture;	Emissions|N2O|Land|+|Agriculture
+Emi|N2O|+|Land-Use Change
+Emi|N2O|Agriculture|+|Animal Waste Management;	Emissions|N2O|Land|Agriculture|+|Animal Waste Management
+Emi|N2O|Agriculture|+|Decay of Crop Residues;	Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Decay of Crop Residues
+Emi|N2O|Agriculture|+|Inorganic Fertilizers;	Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Inorganic Fertilizers
+Emi|N2O|Agriculture|+|Manure applied to Croplands;	Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Manure applied to Croplands
+Emi|N2O|Agriculture|+|Pasture;	Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Pasture
+Emi|N2O|Agriculture|+|Soil Organic Matter Loss;	Emissions|N2O|Land|Agriculture|Agricultural Soils|+|Soil Organic Matter Loss
+Emi|N2O|Agriculture|+|Waste Burning;
