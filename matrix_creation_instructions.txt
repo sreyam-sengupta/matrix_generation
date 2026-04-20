@@ -18,8 +18,8 @@ For example:
   output/Spatially_resolved_BII_rev2/SSP2_BD-none/SSP2_BD-none_BE00_G0000demand_rev2
 
 Assuming you have all these, the next step is to create a matrix. For this, please use the files
-on the add_woodfuel_to_bioenergy branch of the matrix generation repo:
-https://github.com/sreyam-sengupta/matrix_generation/tree/add_woodfuel_to_bioenergy
+on the updated_pipeline branch of the matrix generation repo:
+https://github.com/sreyam-sengupta/matrix_generation/tree/updated_pipeline
 
 Below, we briefly describe each file and what it does.
 
@@ -63,10 +63,10 @@ The script is designed to be run in parallel using the master bash script (file 
 
 ***************************************************************************
 
-(II) "2026-03-20_map_magpie_message_human_corrected.csv"
+(II) "2026-04-20_new_trimmed_mapping.csv"
 
-The mapping file. It contains instructions on how to translate MAgPIE outputs into MESSAGEix-
-readable input: variable renaming, aggregation, and unit conversions. Columns:
+The active mapping file. It contains instructions on how to translate MAgPIE outputs into
+MESSAGEix-readable input: variable renaming, aggregation, and unit conversions. Columns:
   - piam_variable: MAgPIE variable name (PIAM = PIK Integrated Assessment Model)
   - Variable: MESSAGEix variable name
   - factor: unit conversion factor (e.g. Mt N2O/yr -> kt N2O/yr uses factor 1000)
@@ -74,7 +74,8 @@ readable input: variable renaming, aggregation, and unit conversions. Columns:
             (NULL = uniform weights)
   - spatial: spatial aggregation level ("reg+glo" = both regional and global)
 
-This file is a data file and an instruction to the matrix script. It is usually not modified.
+This file is a data file and an instruction to the matrix script. It is semicolon-separated and
+currently aligned to the AR6 variable/unit structure.
 
 ***************************************************************************
 
