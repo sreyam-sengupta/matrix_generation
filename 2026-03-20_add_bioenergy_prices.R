@@ -22,30 +22,56 @@
 library(gdx)
 library(magclass)
 
-# ===== Settings =====
-# BD scenario: "none" or "high" — run once per BD scenario
-# Can be overridden by passing it as a command-line argument:
-#   Rscript 2026-03-20_add_bioenergy_prices.R none
-#   Rscript 2026-03-20_add_bioenergy_prices.R high
-args <- commandArgs(trailingOnly = TRUE)
-bd_scenario <- if (length(args) >= 1 && args[1] %in% c("none", "high")) args[1] else "none"
-message("BD scenario: ", bd_scenario)
+# ===== Settings (rev5 Sustainable CDR; must match main loop script) =====
+MAGPIE_OUTPUT_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+MATRIX_CREATION_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation"
 
-scenario_name  <- paste0("SSP2_BD-", bd_scenario)
-base_run_dir   <- file.path(
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output/Spatially_resolved_BII_rev2",
-  scenario_name
+scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
+date_prefix <- Sys.getenv(
+  "DATE_PREFIX",
+  format(as.POSIXct(Sys.time(), tz = "Europe/Vienna"), "%Y-%m-%d")
 )
-matrix_dir     <- file.path(
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/output"
-)
-matrix_in      <- file.path(matrix_dir, paste0("2026-03-20_magpie_input_", scenario_name, ".csv"))
-matrix_out     <- file.path(matrix_dir, paste0("2026-03-20_magpie_input_", scenario_name, "_with_BE_prices.csv"))
+valid_variants <- c("baseline", "food", "water", "biodiversity", "all", "water-bio")
+bd78_variants <- c("biodiversity", "all", "water-bio")
+if (!scenario_variant %in% valid_variants) {
+  stop(
+    "SCENARIO_VARIANT must be one of: ",
+    paste(valid_variants, collapse = ", "),
+    ". Got: ", scenario_variant
+  )
+}
 
-be_values      <- c(0, 5, 7, 10, 15, 25, 45)
-ghg_values     <- c(0, 10, 20, 50, 100, 200, 400, 600, 1000, 2000, 3000, 4000)
-run_suffix_price  <- "G0000price_rev2"
-run_suffix_demand <- "demand_rev2"
+ssp_subdir <- if (scenario_variant %in% bd78_variants) "SSP2_BD78" else "SSP2_BD00"
+scenario_name <- ssp_subdir
+scenario_tag <- paste0(ssp_subdir, "_", scenario_variant, "_rev5")
+
+magpie_out_override <- Sys.getenv("MASPIE_OUTPUT_DIR", "")
+if (nzchar(magpie_out_override)) {
+  base_run_dir <- magpie_out_override
+} else {
+  base_run_dir <- file.path(
+    MAGPIE_OUTPUT_ROOT,
+    paste0("Sustainable_CDR_", scenario_variant, "_rev5"),
+    ssp_subdir
+  )
+}
+if (!dir.exists(base_run_dir)) {
+  stop("MAgPIE output directory not found: ", base_run_dir)
+}
+
+matrix_dir <- Sys.getenv(
+  "MATRIX_OUTPUT_DIR",
+  file.path(MATRIX_CREATION_ROOT, "output", "rev5_new_mapping", scenario_variant)
+)
+message("Reading MAgPIE runs from: ", base_run_dir)
+message("Matrix directory: ", matrix_dir)
+matrix_in         <- file.path(matrix_dir, paste0(date_prefix, "_magpie_input_", scenario_tag, ".csv"))
+matrix_out        <- file.path(matrix_dir, paste0(date_prefix, "_magpie_input_", scenario_tag, "_with_BE_prices.csv"))
+
+be_values         <- c(0, 5, 7, 10, 15, 25, 45)
+ghg_values        <- c(0, 10, 20, 50, 100, 200, 400, 600, 1000, 2000, 3000, 4000)
+run_suffix_price  <- "G0000_price"
+run_suffix_demand <- "_demand"
 
 PRICE_UNIT <- "US$2005/GJ"
 YEARS      <- c(1995, 2000, 2005, 2010, 2015, 2020, 2025,

@@ -1,0 +1,55 @@
+piam_variable;Variable;factor;weight;spatial
+Resources|Nitrogen|Cropland Budget|Inputs|+|Fertilizer (Mt Nr/yr);Fertilizer Use|Nitrogen (Tg N/yr);1;NULL;reg+glo
+Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr);Emissions|CO2|AFOLU (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|Biomass Burning|+|Burning of Crop Residues (Mt CO2/yr);Emissions|CO2|AFOLU (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|AFOLU|Agriculture (Mt CO2/yr);Emissions|CO2|AFOLU (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|Land-use Change|+|Regrowth (Mt CO2/yr);Emissions|CO2|AFOLU|Afforestation (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|Land-use Change|+|Deforestation (Mt CO2/yr);Emissions|CO2|AFOLU|Deforestation (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CO2|Land|Land-use Change|Regrowth|+|Timber Plantations (Mt CO2/yr);Emissions|CO2|AFOLU|Forest Management (Mt CO2/yr);1;NULL;reg+glo
+Emissions|CH4|Land (Mt CH4/yr);Emissions|CH4|AFOLU (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|+|Agriculture (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|+|Biomass Burning (Mt CH4/yr);Emissions|CH4|AFOLU|Biomass Burning (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Enteric fermentation (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Livestock|Enteric Fermentation (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Animal waste management (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Livestock|Manure Management (Mt CH4/yr);1;NULL;reg+glo
+Emissions|CH4|Land|Agriculture|+|Rice (Mt CH4/yr);Emissions|CH4|AFOLU|Agriculture|Rice (Mt CH4/yr);1;NULL;reg+glo
+Emissions|N2O|Land (Mt N2O/yr);Emissions|N2O|AFOLU (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|+|Agriculture (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|Agriculture|+|Agricultural Soils (Mt N2O/yr);Emissions|N2O|AFOLU|Agriculture|Managed Soils (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|+|Biomass Burning (Mt N2O/yr);Emissions|N2O|AFOLU|Biomass Burning (kt N2O/yr);1000;NULL;reg+glo
+Emissions|N2O|Land|+|Peatland (Mt N2O/yr);Emissions|N2O|AFOLU|Land (kt N2O/yr);1000;NULL;reg+glo
+SDG|SDG02|Prevalence of underweight (million);Population|Risk of Hunger (million);1;NULL;reg+glo
+Resources|Land Cover (million ha);Land Cover (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Urban Area (million ha);Land Cover|Built-up Area (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Cropland (million ha);Land Cover|Cropland (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|+|Bioenergy crops (million ha);Land Cover|Cropland|Energy Crops (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|+|Forage (million ha);Land Cover|Cropland|Non-Energy Crops (million ha);1;NULL;reg+glo
+Resources|Land Cover|Cropland|Croparea|+|Crops (million ha);Land Cover|Cropland|Non-Energy Crops (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Forest (million ha);Land Cover|Forest (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Pastures and Rangelands (million ha);Land Cover|Pasture (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Natural|+|NPI_NDC AR (million ha);Land Cover|Forest|Afforestation and Reforestation (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Natural|+|CO2-price AR (million ha);Land Cover|Forest|Afforestation and Reforestation (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Plantations|+|CO2-price AR (million ha);Land Cover|Forest|Afforestation and Reforestation (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Plantations|+|Timber (million ha);Land Cover|Forest|Forest old (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Natural Forest|+|Secondary Forest (million ha);Land Cover|Forest|Forest old (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Natural Forest|+|Primary Forest (million ha);Land Cover|Forest|Forest old (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Natural Forest|+|Primary Forest (million ha);Land Cover|Forest|Natural Forest (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Natural Forest|+|Secondary Forest (million ha);Land Cover|Forest|Natural Forest (million ha);1;NULL;reg+glo
+Resources|Land Cover|Forest|Planted Forest|Plantations|+|Timber (million ha);Land Cover|Forest|Managed (million ha);1;NULL;reg+glo
+Resources|Land Cover|+|Other Land (million ha);Land Cover|Other Land (million ha);1;NULL;reg+glo
+SDG|SDG15|Terrestrial biodiversity (index);Biodiversity|BII (unitless);1;NULL;reg+glo
+Biodiversity|Biodiversity Hotspot BII (unitless);Biodiversity|BII|Biodiversity hotspots (unitless);1;NULL;reg+glo
+Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);1;NULL;reg+glo
+Emissions|CH4|Land (Mt CH4/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);25;NULL;reg+glo
+Emissions|N2O|Land (Mt N2O/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);0.285;NULL;reg+glo
+Nutrition|Calorie Supply (kcal/capita/day);Food Demand (kcal/cap/day);1;NULL;reg+glo
+Nutrition|Calorie Supply|+|Crops (kcal/capita/day);Food Demand|Crops (kcal/cap/day);1;NULL;reg+glo
+Nutrition|Calorie Supply|+|Livestock products (kcal/capita/day);Food Demand|Livestock (kcal/cap/day);1;NULL;reg+glo
+Timber|Volumetric|Demand|+|Roundwood (Mm3/yr);Forestry Demand|Roundwood (million m3/yr);1;NULL;reg+glo
+Timber|Volumetric|Demand|Roundwood|+|Industrial roundwood (Mm3/yr);Forestry Demand|Roundwood|Industrial Roundwood (million m3/yr);1;NULL;reg+glo
+Timber|Volumetric|Demand|Roundwood|+|Wood fuel (Mm3/yr);Forestry Demand|Roundwood|Wood Fuel (million m3/yr);1;NULL;reg+glo
+Timber|Volumetric|Production|Roundwood|+|Wood fuel (Mm3/yr);Forestry Production|Roundwood|Wood Fuel (million m3/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|1st generation (EJ/yr);Primary Energy|Biomass (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|2nd generation (EJ/yr);Primary Energy|Biomass (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|Traditional Burning (EJ/yr);Primary Energy|Biomass (EJ/yr);1;NULL;reg+glo
+Prices|Bioenergy (US$2017/GJ);Price|Primary Energy|Biomass (US$2005/GJ);0.813008130081301;NULL;reg+glo
+Prices|GHG Emission|CO2|Peatland (US$2017/tCO2);Price|Carbon|CO2 (US$2005/t CO2);0.813008130081301;NULL;reg+glo

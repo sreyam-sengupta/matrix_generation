@@ -1,21 +1,36 @@
 #!/usr/bin/env bash
 # =============================================================================
-# Master pipeline: generate matrices for BD-none and BD-high
+# Master pipeline: Sustainable CDR rev5 (baseline, food, water, biodiversity, all, water-bio)
 #
-# Runs the full pipeline sequentially for both BD scenarios:
+# Runs the full pipeline per scenario:
 #   1. raw + map + matrix phases  (2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R)
 #   2. add bioenergy prices        (2026-03-20_add_bioenergy_prices.R)
 #   3. add woodfuel to bioenergy   (2026-04-09_add_woodfuel_to_bioenergy.R)
 #
-# Usage:
-#   bash 2026-03-20_run_matrix_pipeline.sh              # runs both BD-none and BD-high
-#   bash 2026-03-20_run_matrix_pipeline.sh none         # runs BD-none only
-#   bash 2026-03-20_run_matrix_pipeline.sh high         # runs BD-high only
+# MAgPIE run folders (rev5):
+#   baseline, food, water:
+#     .../Sustainable_CDR_{variant}_rev5/SSP2_BD00/
+#       SSP2_BD00_BE{xx}_G{yyyy}_demand
+#       SSP2_BD00_BE{xx}_G0000_price
+#   biodiversity, all, water-bio:
+#     .../Sustainable_CDR_{variant}_rev5/SSP2_BD78/
+#       SSP2_BD78_BE{xx}_G{yyyy}_demand
+#       SSP2_BD78_BE{xx}_G0000_price
 #
-# Parallel raw-phase option (optional):
-#   Set PARALLEL=true to run all 7 BE-price instances in parallel per BD scenario.
-#   Each instance handles one BE price level via BE_PRICE_FILTER.
-#   Logs go to output/logs/.
+# Usage (baseline only):
+#   cd .../matrix_creation
+#   TARGET_SCENARIOS=baseline bash 2026-03-20_run_matrix_pipeline.sh
+#
+# All five scenario sets:
+#   TARGET_SCENARIOS=baseline,food,water,biodiversity,all,water-bio bash 2026-03-20_run_matrix_pipeline.sh
+#
+# Parallel raw phase (7 BE shards):
+#   PARALLEL=true TARGET_SCENARIOS=baseline bash 2026-03-20_run_matrix_pipeline.sh
+#
+# Optional overrides:
+#   DATE_PREFIX=2026-06-05
+#   MASPIE_OUTPUT_DIR=/path/to/SSP2_BD00   # explicit MAgPIE run folder
+#   MATRIX_OUTPUT_DIR=/path/to/matrix/out  # default: output/rev5_new_mapping/<variant>
 # =============================================================================
 
 set -euo pipefail
@@ -24,88 +39,138 @@ SCRIPT_DIR="$(cd "$(dirname "${BASH_SOURCE[0]}")" && pwd)"
 LOOP_SCRIPT="$SCRIPT_DIR/2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
 POST_SCRIPT="$SCRIPT_DIR/2026-03-20_add_bioenergy_prices.R"
 WOOD_SCRIPT="$SCRIPT_DIR/2026-04-09_add_woodfuel_to_bioenergy.R"
-LOG_DIR="$SCRIPT_DIR/output/logs"
-mkdir -p "$LOG_DIR"
 
-# BD scenarios to run (override with CLI argument)
-ARG="${1:-both}"
-if   [[ "$ARG" == "none" ]]; then BD_SCENARIOS=("none")
-elif [[ "$ARG" == "high" ]]; then BD_SCENARIOS=("high")
-else                               BD_SCENARIOS=("none" "high")
-fi
+MAGPIE_OUTPUT_ROOT="/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+DATE_PREFIX="${DATE_PREFIX:-$(TZ=Europe/Vienna date +%Y-%m-%d)}"
+TARGET_SCENARIOS="${TARGET_SCENARIOS:-baseline}"
 
-# Set PARALLEL=true to run 7 BE-price instances in parallel (raw phase only)
 PARALLEL="${PARALLEL:-false}"
 BE_VALUES=(0 5 7 10 15 25 45)
+VALID_SCENARIOS=(baseline food water biodiversity all water-bio)
+BD78_SCENARIOS=(biodiversity all water-bio)
 
 log() { echo "[$(date '+%Y-%m-%d %H:%M:%S')] $*"; }
 
+magpie_input_dir() {
+    local variant="$1"
+    if [[ -n "${MASPIE_OUTPUT_DIR:-}" ]]; then
+        echo "$MASPIE_OUTPUT_DIR"
+        return
+    fi
+    local ssp="SSP2_BD00"
+    if [[ " ${BD78_SCENARIOS[*]} " =~ " ${variant} " ]]; then
+        ssp="SSP2_BD78"
+    fi
+    echo "${MAGPIE_OUTPUT_ROOT}/Sustainable_CDR_${variant}_rev5/${ssp}"
+}
+
+preflight_check() {
+    local variant="$1"
+    local indir
+    indir="$(magpie_input_dir "$variant")"
+    if [[ ! -d "$indir" ]]; then
+        echo "ERROR: MAgPIE output directory not found: $indir"
+        exit 1
+    fi
+    local n_demand n_mif
+    n_demand=$(find "$indir" -maxdepth 1 -type d -name '*_demand' 2>/dev/null | wc -l)
+    n_mif=$(find "$indir" -maxdepth 1 -type d -name '*_demand' -exec test -f '{}/report.mif' \; -print 2>/dev/null | wc -l)
+    log "${variant}: ${n_mif}/${n_demand} demand runs with report.mif in ${indir}"
+    if [[ "$n_mif" -lt 84 ]]; then
+        echo "WARNING: expected 84 demand runs with report.mif for ${variant}; found ${n_mif}"
+    fi
+}
+
 run_loop_sequential() {
-    local bd="$1"
-    local logfile="$LOG_DIR/matrix_loop_BD-${bd}_$(date '+%Y%m%d-%H%M%S').log"
-    log "BD-${bd}: starting matrix loop (sequential) → $logfile"
-    Rscript "$LOOP_SCRIPT" "$bd" 2>&1 | tee "$logfile"
-    log "BD-${bd}: matrix loop done"
+    local logfile="$LOG_DIR/matrix_loop_${SCENARIO}_$(date '+%Y%m%d-%H%M%S').log"
+    log "${SCENARIO}: starting matrix loop (sequential) → $logfile"
+    SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile"
+    log "${SCENARIO}: matrix loop done"
 }
 
 run_loop_parallel() {
-    local bd="$1"
-    log "BD-${bd}: starting matrix loop (parallel, 7 BE instances)"
+    log "${SCENARIO}: starting matrix loop (parallel, 7 BE instances)"
     local pids=()
     for be in "${BE_VALUES[@]}"; do
-        local logfile="$LOG_DIR/matrix_loop_BD-${bd}_BE${be}_$(date '+%Y%m%d-%H%M%S').log"
+        local logfile="$LOG_DIR/matrix_loop_${SCENARIO}_BE${be}_$(date '+%Y%m%d-%H%M%S').log"
         log "  Launching BE=${be} instance → $logfile"
-        BE_PRICE_FILTER="$be" Rscript "$LOOP_SCRIPT" "$bd" 2>&1 | tee "$logfile" &
+        SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
+            MASPIE_OUTPUT_DIR="$MASPIE_IN" BE_PRICE_FILTER="$be" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile" &
         pids+=($!)
     done
-    log "BD-${bd}: waiting for all 7 BE instances to finish..."
+    log "${SCENARIO}: waiting for all 7 BE instances to finish..."
     for pid in "${pids[@]}"; do
         wait "$pid"
     done
-    log "BD-${bd}: all BE instances done"
+    log "${SCENARIO}: all BE raw shards done"
 
-    # Run once more without filter to execute map+matrix phases (which aggregate all BEs)
-    local logfile="$LOG_DIR/matrix_loop_BD-${bd}_map_matrix_$(date '+%Y%m%d-%H%M%S').log"
-    log "BD-${bd}: running map+matrix phases → $logfile"
-    Rscript "$LOOP_SCRIPT" "$bd" 2>&1 | tee "$logfile"
-    log "BD-${bd}: map+matrix phases done"
+    local logfile="$LOG_DIR/matrix_loop_${SCENARIO}_map_matrix_$(date '+%Y%m%d-%H%M%S').log"
+    log "${SCENARIO}: running map+matrix phases → $logfile"
+    SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" PHASES_FILTER="map,matrix" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile"
+    log "${SCENARIO}: map+matrix phases done"
 }
 
-run_post() {
-    local bd="$1"
-    local logfile="$LOG_DIR/add_BE_prices_BD-${bd}_$(date '+%Y%m%d-%H%M%S').log"
-    log "BD-${bd}: adding bioenergy prices → $logfile"
-    Rscript "$POST_SCRIPT" "$bd" 2>&1 | tee "$logfile"
-    log "BD-${bd}: bioenergy prices added"
+run_post_be_prices() {
+    local logfile="$LOG_DIR/add_BE_prices_${SCENARIO}_$(date '+%Y%m%d-%H%M%S').log"
+    log "${SCENARIO}: adding bioenergy prices → $logfile"
+    SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" Rscript "$POST_SCRIPT" 2>&1 | tee "$logfile"
+    log "${SCENARIO}: bioenergy prices added"
 }
 
-run_woodfuel_post() {
-    local bd="$1"
-    local logfile="$LOG_DIR/add_woodfuel_BD-${bd}_$(date '+%Y%m%d-%H%M%S').log"
-    log "BD-${bd}: adding woodfuel to Primary Energy|Biomass → $logfile"
-    Rscript "$WOOD_SCRIPT" "$bd" 2>&1 | tee "$logfile"
-    log "BD-${bd}: woodfuel post-processing added"
+run_post_woodfuel() {
+    local logfile="$LOG_DIR/add_woodfuel_${SCENARIO}_$(date '+%Y%m%d-%H%M%S').log"
+    log "${SCENARIO}: adding woodfuel to Primary Energy|Biomass → $logfile"
+    SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" Rscript "$WOOD_SCRIPT" 2>&1 | tee "$logfile"
+    log "${SCENARIO}: woodfuel post-processing done"
 }
 
 # ---- Main ----
-log "Pipeline starting. BD scenarios: ${BD_SCENARIOS[*]}"
-log "Parallel raw phase: $PARALLEL"
-
-for bd in "${BD_SCENARIOS[@]}"; do
-    log "===== BD-${bd}: BEGIN ====="
-
-    if [[ "$PARALLEL" == "true" ]]; then
-        run_loop_parallel "$bd"
-    else
-        run_loop_sequential "$bd"
+IFS=',' read -r -a scenario_list <<< "$TARGET_SCENARIOS"
+for scenario_item in "${scenario_list[@]}"; do
+    SCENARIO_VARIANT="$(echo "$scenario_item" | xargs | tr '[:upper:]' '[:lower:]')"
+    if [[ ! " ${VALID_SCENARIOS[*]} " =~ " ${SCENARIO_VARIANT} " ]]; then
+        echo "Unsupported scenario variant: '$SCENARIO_VARIANT'"
+        echo "Allowed: ${VALID_SCENARIOS[*]}"
+        exit 1
     fi
 
-    run_post "$bd"
-    run_woodfuel_post "$bd"
+    if [[ " ${BD78_SCENARIOS[*]} " =~ " ${SCENARIO_VARIANT} " ]]; then
+        SCENARIO="SSP2_BD78_${SCENARIO_VARIANT}_rev5"
+    else
+        SCENARIO="SSP2_BD00_${SCENARIO_VARIANT}_rev5"
+    fi
 
-    log "===== BD-${bd}: DONE ====="
-    log "Final matrix: $SCRIPT_DIR/output/2026-03-20_magpie_input_SSP2_BD-${bd}_with_BE_prices.csv"
-    log "Final matrix (with woodfuel): $SCRIPT_DIR/output/2026-04-09_magpie_input_SSP2_BD-${bd}_with_woodfuel.csv"
+    MASPIE_IN="$(magpie_input_dir "$SCENARIO_VARIANT")"
+    # Matrix output per scenario variant under output/rev5_new_mapping/{baseline,food,water,biodiversity,all,water-bio}
+    OUT_DIR="$SCRIPT_DIR/output/rev5_new_mapping/$SCENARIO_VARIANT"
+    LOG_DIR="$OUT_DIR/logs"
+    mkdir -p "$LOG_DIR"
+
+    preflight_check "$SCENARIO_VARIANT"
+
+    log "Pipeline starting for ${SCENARIO}"
+    log "MAgPIE input: ${MASPIE_IN}"
+    log "Matrix output: ${OUT_DIR}"
+    log "Parallel raw phase: $PARALLEL"
+    log "DATE_PREFIX: $DATE_PREFIX"
+
+    if [[ "$PARALLEL" == "true" ]]; then
+        run_loop_parallel
+    else
+        run_loop_sequential
+    fi
+
+    run_post_be_prices
+    run_post_woodfuel
+
+    log "===== ${SCENARIO}: DONE ====="
+    log "Matrix (base):           $OUT_DIR/${DATE_PREFIX}_magpie_input_${SCENARIO}.csv"
+    log "Matrix (+ BE prices):    $OUT_DIR/${DATE_PREFIX}_magpie_input_${SCENARIO}_with_BE_prices.csv"
+    log "Matrix (+ woodfuel):     $OUT_DIR/${DATE_PREFIX}_magpie_input_${SCENARIO}.csv"
 done
 
 log "All done!"

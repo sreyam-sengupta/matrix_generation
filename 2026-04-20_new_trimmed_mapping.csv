@@ -47,3 +47,17 @@ SDG|SDG15|Terrestrial biodiversity (index);Biodiversity|BII (unitless);1;NULL;re
 Emissions|CO2|Land|+|Land-use Change (Mt CO2/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);1;NULL;reg+glo
 Emissions|CH4|Land (Mt CH4/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);25;NULL;reg+glo
 Emissions|N2O|Land (Mt N2O/yr);Emissions|GHG|AFOLU (Mt CO2e/yr);0.285;NULL;reg+glo
+Prices|Bioenergy (US$2017/GJ);Price|Primary Energy|Biomass (US$2005/GJ);1;NULL;reg+glo
+Demand|Bioenergy|++|1st generation (EJ/yr);Primary Energy|Biomass (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|2nd generation (EJ/yr);Primary Energy|Biomass (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|Traditional Burning (EJ/yr);Primary Energy|Biomass (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|1st generation (EJ/yr);Primary Energy|Biomass|1st Generation (EJ/yr);1;NULL;reg+glo
+ZERO (NA);Primary Energy|Biomass|1st Generation|Biodiesel (EJ/yr);1;NULL;reg+glo
+ZERO (NA);Primary Energy|Biomass|1st Generation|Bioethanol (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|2nd generation|++|Bioenergy crops (EJ/yr);Primary Energy|Biomass|Energy Crops (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|++|Traditional Burning (EJ/yr);Primary Energy|Biomass|Fuelwood (EJ/yr);1;NULL;reg+glo
+ZERO (NA);Primary Energy|Biomass|Other (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|2nd generation|++|Crop residues (EJ/yr);Primary Energy|Biomass|Residues (EJ/yr);1;NULL;reg+glo
+ZERO (NA);Primary Energy|Biomass|Residues|Forest industry (EJ/yr);1;NULL;reg+glo
+ZERO (NA);Primary Energy|Biomass|Residues|Logging (EJ/yr);1;NULL;reg+glo
+Demand|Bioenergy|2nd generation|++|Forest products (EJ/yr);Primary Energy|Biomass|Roundwood harvest (EJ/yr);1;NULL;reg+glo

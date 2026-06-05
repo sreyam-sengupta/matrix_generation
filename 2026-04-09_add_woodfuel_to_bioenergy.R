@@ -2,51 +2,70 @@
 
 # Post-processing script: add woodfuel energy to Primary Energy|Biomass.
 #
-# This script updates a pre-existing matrix (typically already containing P1/P2/P3)
-# by reading woodfuel demand from demand-driven fulldata.gdx files and converting it
-# from mass to energy units (EJ), then adding it to:
-#   Variable == "Primary Energy|Biomass"
+# Reads woodfuel demand from demand-driven fulldata.gdx files, converts mass to EJ,
+# and adds to Variable == "Primary Energy|Biomass".
 #
-# Usage:
-#   Rscript 2026-04-09_add_woodfuel_to_bioenergy.R none
-#   Rscript 2026-04-09_add_woodfuel_to_bioenergy.R high
-#
-# Notes:
-# - Conversion uses the "ge" entry from fm_attributes for woodfuel (GJ/tDM).
-# - pm_demand_forestry is assumed in million tons, so:
-#       EJ = (million tons) * 1e6 * (GJ/t) / 1e9
-#          = (million tons) * (GJ/t) / 1000
-# - The script writes a matrix with "_with_woodfuel.csv" suffix and does not alter
-#   the input file.
+# Expects input matrix from add_bioenergy_prices (with P1/P2/P3 columns).
+# Writes *_with_woodfuel.csv; does not alter the input file.
 
 library(magclass)
 library(gdx2)
 
-args <- commandArgs(trailingOnly = TRUE)
-bd_scenario <- if (length(args) >= 1 && args[1] %in% c("none", "high")) args[1] else "none"
-message("BD scenario: ", bd_scenario)
+# ===== Settings (rev5 Sustainable CDR; must match main loop script) =====
+MAGPIE_OUTPUT_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+MATRIX_CREATION_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation"
 
-scenario_name <- paste0("SSP2_BD-", bd_scenario)
-
-base_run_dir <- file.path(
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output/Spatially_resolved_BII_rev2",
-  scenario_name
+scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
+date_prefix <- Sys.getenv(
+  "DATE_PREFIX",
+  format(as.POSIXct(Sys.time(), tz = "Europe/Vienna"), "%Y-%m-%d")
 )
+valid_variants <- c("baseline", "food", "water", "biodiversity", "all", "water-bio")
+bd78_variants <- c("biodiversity", "all", "water-bio")
+if (!scenario_variant %in% valid_variants) {
+  stop(
+    "SCENARIO_VARIANT must be one of: ",
+    paste(valid_variants, collapse = ", "),
+    ". Got: ", scenario_variant
+  )
+}
 
-matrix_dir <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation/output"
-matrix_in <- file.path(matrix_dir, paste0("2026-03-20_magpie_input_", scenario_name, "_with_BE_prices.csv"))
-matrix_out <- file.path(matrix_dir, paste0("2026-04-09_magpie_input_", scenario_name, "_with_woodfuel.csv"))
+ssp_subdir <- if (scenario_variant %in% bd78_variants) "SSP2_BD78" else "SSP2_BD00"
+scenario_name <- ssp_subdir
+scenario_tag <- paste0(ssp_subdir, "_", scenario_variant, "_rev5")
 
-be_values <- c(0, 5, 7, 10, 15, 25, 45)
-ghg_values <- c(0, 10, 20, 50, 100, 200, 400, 600, 1000, 2000, 3000, 4000)
-run_suffix_demand <- "demand_rev2"
+magpie_out_override <- Sys.getenv("MASPIE_OUTPUT_DIR", "")
+if (nzchar(magpie_out_override)) {
+  base_run_dir <- magpie_out_override
+} else {
+  base_run_dir <- file.path(
+    MAGPIE_OUTPUT_ROOT,
+    paste0("Sustainable_CDR_", scenario_variant, "_rev5"),
+    ssp_subdir
+  )
+}
+if (!dir.exists(base_run_dir)) {
+  stop("MAgPIE output directory not found: ", base_run_dir)
+}
+
+matrix_dir <- Sys.getenv(
+  "MATRIX_OUTPUT_DIR",
+  file.path(MATRIX_CREATION_ROOT, "output", "rev5_new_mapping", scenario_variant)
+)
+message("Reading MAgPIE runs from: ", base_run_dir)
+message("Matrix directory: ", matrix_dir)
+matrix_in         <- file.path(matrix_dir, paste0(date_prefix, "_magpie_input_", scenario_tag, "_with_BE_prices.csv"))
+matrix_out        <- file.path(matrix_dir, paste0(date_prefix, "_magpie_input_", scenario_tag, ".csv"))
+
+be_values         <- c(0, 5, 7, 10, 15, 25, 45)
+ghg_values        <- c(0, 10, 20, 50, 100, 200, 400, 600, 1000, 2000, 3000, 4000)
+run_suffix_demand <- "_demand"
 
 years <- c(1995, 2000, 2005, 2010, 2015, 2020, 2025,
            2030, 2035, 2040, 2045, 2050, 2055, 2060,
            2070, 2080, 2090, 2100, 2110)
 year_cols <- as.character(years)
 
-# Region mapping consistent with matrix generation script
 region_map <- c(
   AFR = "SubSaharanAfrica",
   CHA = "ChinaReg",
@@ -62,13 +81,13 @@ region_map <- c(
   WEU = "WesternEurope",
   GLO = "World"
 )
+# ==============================================================
 
 if (!file.exists(matrix_in)) {
   stop("Matrix input file not found: ", matrix_in)
 }
 mat <- read.csv(matrix_in, stringsAsFactors = FALSE, check.names = FALSE)
 
-# Determine energy conversion coefficient from one existing run
 sample_gdx <- file.path(base_run_dir, paste0(scenario_name, "_BE00_G0000", run_suffix_demand), "fulldata.gdx")
 if (!file.exists(sample_gdx)) stop("Sample GDX not found: ", sample_gdx)
 
@@ -91,17 +110,12 @@ extract_woodfuel_ej <- function(gdx_path) {
     stop("Unexpected pm_demand_forestry structure in: ", gdx_path)
   }
 
-  # Keep target years only
   wf_df <- wf_df[wf_df$Year %in% years, c("Region", "Year", "Value")]
-
-  # Convert million tons to EJ: Value * 1e6 * ge / 1e9
   wf_df$Value <- as.numeric(wf_df$Value) * woodfuel_ge / 1000
 
-  # Map region codes to matrix names
   wf_df$Region <- unname(region_map[wf_df$Region])
   wf_df <- wf_df[!is.na(wf_df$Region), , drop = FALSE]
 
-  # Add World as sum across mapped regions
   world_rows <- aggregate(Value ~ Year, data = wf_df, sum, na.rm = TRUE)
   world_rows$Region <- "World"
   wf_df <- rbind(wf_df, world_rows[, c("Region", "Year", "Value")])
@@ -131,7 +145,6 @@ for (be in be_values) {
 }
 wood_df <- do.call(rbind, all_rows)
 
-# Reshape to wide format by year for matrix merge
 wood_wide <- reshape(
   wood_df,
   idvar = c("Region", "BIOscen", "GHGscen"),
