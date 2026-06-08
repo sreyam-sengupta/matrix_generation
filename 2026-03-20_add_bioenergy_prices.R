@@ -16,15 +16,28 @@
 # in the demand-driven report.mif via the mapping file — identical to P3. It is removed here
 # and replaced by the three distinct P1/P2/P3 columns described above.
 #
-# Unit: all three are output as "US$2005/GJ" (matching the existing matrix convention;
-# the mapping file uses factor=1 for Prices|Bioenergy, so no numerical conversion).
+# Unit: all three are output as "US$2005/GJ". MAgPIE reports Prices|Bioenergy and the
+# exogenous subsidy in US$2017/GJ; this script applies the mapping-file factor
+# (Prices|Bioenergy -> Price|Primary Energy|Biomass) to convert to US$2005/GJ.
 
 library(gdx)
 library(magclass)
 
 # ===== Settings (rev5 Sustainable CDR; must match main loop script) =====
-MAGPIE_OUTPUT_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
-MATRIX_CREATION_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  script_path <- sub("--file=", "", args[grep("--file=", args)])
+  if (length(script_path) == 0) {
+    return(normalizePath(getwd()))
+  }
+  dirname(normalizePath(script_path[1]))
+}
+
+MAGPIE_OUTPUT_ROOT <- Sys.getenv(
+  "MAGPIE_OUTPUT_ROOT",
+  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+)
+MATRIX_CREATION_ROOT <- Sys.getenv("MATRIX_CREATION_ROOT", get_script_dir())
 
 scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
 date_prefix <- Sys.getenv(
@@ -78,6 +91,30 @@ YEARS      <- c(1995, 2000, 2005, 2010, 2015, 2020, 2025,
                 2030, 2035, 2040, 2045, 2050, 2055, 2060,
                 2070, 2080, 2090, 2100, 2110)
 # =====================
+
+map_file <- Sys.getenv(
+  "MAP_FILE",
+  file.path(MATRIX_CREATION_ROOT, "2026-06-05_MM_mapping_ds.csv")
+)
+get_bioenergy_usd2017_to_2005_factor <- function(path) {
+  if (!file.exists(path)) {
+    stop("Mapping file not found: ", path)
+  }
+  mapping <- read.csv(path, sep = ";", stringsAsFactors = FALSE, check.names = FALSE)
+  target <- "Prices|Bioenergy (US$2017/GJ)"
+  hits <- mapping[mapping$piam_variable == target, , drop = FALSE]
+  if (nrow(hits) == 0) {
+    stop("Could not find mapping row for: ", target)
+  }
+  as.numeric(hits$factor[1])
+}
+USD2017_TO_2005 <- get_bioenergy_usd2017_to_2005_factor(map_file)
+message("Bioenergy price conversion factor (US$2017 -> US$2005): ", USD2017_TO_2005)
+
+convert_bio_price_vals <- function(vals, factor) {
+  out <- as.numeric(vals) * factor
+  setNames(out, names(vals))
+}
 
 # Helper: extract Prices|Bioenergy for World from a report.mif
 read_mif_bio_price <- function(mif_path) {
@@ -164,11 +201,15 @@ for (be in be_values) {
       p1_vals  <- setNames(as.numeric(p1_named[as.character(YEARS)]), as.character(YEARS))
     }
   }
-  message("P1 BE", be_str, ": read from ", price_run, " (GDX). Year 2050 value = ", p1_vals["2050"])
+  p1_vals <- convert_bio_price_vals(p1_vals, USD2017_TO_2005)
+  message(
+    "P1 BE", be_str, ": read from ", price_run,
+    " (GDX). Year 2050 value (US$2005/GJ) = ", p1_vals["2050"]
+  )
 
   # ---- P2: price-driven report.mif (same for all GHG) ----
   mif_price <- file.path(base_run_dir, price_run, "report.mif")
-  p2_vals   <- read_mif_bio_price(mif_price)
+  p2_vals   <- convert_bio_price_vals(read_mif_bio_price(mif_price), USD2017_TO_2005)
   message("P2 BE", be_str, ": read from ", price_run)
 
   for (ghg in ghg_values) {
@@ -187,7 +228,7 @@ for (be in be_values) {
     # ---- P3: demand-driven report.mif (unique per BE x GHG) ----
     demand_run <- paste0(scenario_name, "_BE", be_str, "_G", ghg_str, run_suffix_demand)
     mif_demand <- file.path(base_run_dir, demand_run, "report.mif")
-    p3_vals    <- read_mif_bio_price(mif_demand)
+    p3_vals    <- convert_bio_price_vals(read_mif_bio_price(mif_demand), USD2017_TO_2005)
 
     new_rows_p3[[length(new_rows_p3) + 1]] <- make_price_rows(
       "Price|Primary Energy|Biomass_endo_P3_demand-driven",

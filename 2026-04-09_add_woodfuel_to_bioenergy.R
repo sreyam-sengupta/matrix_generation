@@ -12,8 +12,20 @@ library(magclass)
 library(gdx2)
 
 # ===== Settings (rev5 Sustainable CDR; must match main loop script) =====
-MAGPIE_OUTPUT_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
-MATRIX_CREATION_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  script_path <- sub("--file=", "", args[grep("--file=", args)])
+  if (length(script_path) == 0) {
+    return(normalizePath(getwd()))
+  }
+  dirname(normalizePath(script_path[1]))
+}
+
+MAGPIE_OUTPUT_ROOT <- Sys.getenv(
+  "MAGPIE_OUTPUT_ROOT",
+  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+)
+MATRIX_CREATION_ROOT <- Sys.getenv("MATRIX_CREATION_ROOT", get_script_dir())
 
 scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
 date_prefix <- Sys.getenv(

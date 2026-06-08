@@ -30,7 +30,10 @@
 # Optional overrides:
 #   DATE_PREFIX=2026-06-05
 #   MASPIE_OUTPUT_DIR=/path/to/SSP2_BD00   # explicit MAgPIE run folder
+#   MAGPIE_OUTPUT_ROOT=/path/to/magpie/output
 #   MATRIX_OUTPUT_DIR=/path/to/matrix/out  # default: output/rev5_new_mapping/<variant>
+#   MATRIX_CREATION_ROOT=/path/to/repo     # default: directory containing this script
+#   MAP_FILE=/path/to/mapping.csv          # default: $MATRIX_CREATION_ROOT/2026-06-05_MM_mapping_ds.csv
 # =============================================================================
 
 set -euo pipefail
@@ -40,7 +43,10 @@ LOOP_SCRIPT="$SCRIPT_DIR/2026-03-20_MMEmu_createMatrix-MP_loop_trimmed.R"
 POST_SCRIPT="$SCRIPT_DIR/2026-03-20_add_bioenergy_prices.R"
 WOOD_SCRIPT="$SCRIPT_DIR/2026-04-09_add_woodfuel_to_bioenergy.R"
 
-MAGPIE_OUTPUT_ROOT="/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+export MATRIX_CREATION_ROOT="${MATRIX_CREATION_ROOT:-$SCRIPT_DIR}"
+export MAP_FILE="${MAP_FILE:-$MATRIX_CREATION_ROOT/2026-06-05_MM_mapping_ds.csv}"
+
+MAGPIE_OUTPUT_ROOT="${MAGPIE_OUTPUT_ROOT:-/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output}"
 DATE_PREFIX="${DATE_PREFIX:-$(TZ=Europe/Vienna date +%Y-%m-%d)}"
 TARGET_SCENARIOS="${TARGET_SCENARIOS:-baseline}"
 
@@ -85,7 +91,8 @@ run_loop_sequential() {
     local logfile="$LOG_DIR/matrix_loop_${SCENARIO}_$(date '+%Y%m%d-%H%M%S').log"
     log "${SCENARIO}: starting matrix loop (sequential) → $logfile"
     SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
-        MASPIE_OUTPUT_DIR="$MASPIE_IN" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile"
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" MAP_FILE="$MAP_FILE" MATRIX_CREATION_ROOT="$MATRIX_CREATION_ROOT" \
+        Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile"
     log "${SCENARIO}: matrix loop done"
 }
 
@@ -96,7 +103,8 @@ run_loop_parallel() {
         local logfile="$LOG_DIR/matrix_loop_${SCENARIO}_BE${be}_$(date '+%Y%m%d-%H%M%S').log"
         log "  Launching BE=${be} instance → $logfile"
         SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
-            MASPIE_OUTPUT_DIR="$MASPIE_IN" BE_PRICE_FILTER="$be" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile" &
+            MASPIE_OUTPUT_DIR="$MASPIE_IN" MAP_FILE="$MAP_FILE" MATRIX_CREATION_ROOT="$MATRIX_CREATION_ROOT" \
+            BE_PRICE_FILTER="$be" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile" &
         pids+=($!)
     done
     log "${SCENARIO}: waiting for all 7 BE instances to finish..."
@@ -108,7 +116,8 @@ run_loop_parallel() {
     local logfile="$LOG_DIR/matrix_loop_${SCENARIO}_map_matrix_$(date '+%Y%m%d-%H%M%S').log"
     log "${SCENARIO}: running map+matrix phases → $logfile"
     SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
-        MASPIE_OUTPUT_DIR="$MASPIE_IN" PHASES_FILTER="map,matrix" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile"
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" MAP_FILE="$MAP_FILE" MATRIX_CREATION_ROOT="$MATRIX_CREATION_ROOT" \
+        PHASES_FILTER="map,matrix" Rscript "$LOOP_SCRIPT" 2>&1 | tee "$logfile"
     log "${SCENARIO}: map+matrix phases done"
 }
 
@@ -116,7 +125,8 @@ run_post_be_prices() {
     local logfile="$LOG_DIR/add_BE_prices_${SCENARIO}_$(date '+%Y%m%d-%H%M%S').log"
     log "${SCENARIO}: adding bioenergy prices → $logfile"
     SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
-        MASPIE_OUTPUT_DIR="$MASPIE_IN" Rscript "$POST_SCRIPT" 2>&1 | tee "$logfile"
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" MAP_FILE="$MAP_FILE" MATRIX_CREATION_ROOT="$MATRIX_CREATION_ROOT" \
+        Rscript "$POST_SCRIPT" 2>&1 | tee "$logfile"
     log "${SCENARIO}: bioenergy prices added"
 }
 
@@ -124,7 +134,8 @@ run_post_woodfuel() {
     local logfile="$LOG_DIR/add_woodfuel_${SCENARIO}_$(date '+%Y%m%d-%H%M%S').log"
     log "${SCENARIO}: adding woodfuel to Primary Energy|Biomass → $logfile"
     SCENARIO_VARIANT="$SCENARIO_VARIANT" DATE_PREFIX="$DATE_PREFIX" MATRIX_OUTPUT_DIR="$OUT_DIR" \
-        MASPIE_OUTPUT_DIR="$MASPIE_IN" Rscript "$WOOD_SCRIPT" 2>&1 | tee "$logfile"
+        MASPIE_OUTPUT_DIR="$MASPIE_IN" MAP_FILE="$MAP_FILE" MATRIX_CREATION_ROOT="$MATRIX_CREATION_ROOT" \
+        Rscript "$WOOD_SCRIPT" 2>&1 | tee "$logfile"
     log "${SCENARIO}: woodfuel post-processing done"
 }
 

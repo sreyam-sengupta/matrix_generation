@@ -15,10 +15,23 @@ library(hash)
 #   MASPIE_OUTPUT_DIR = optional explicit path to SSP2_BD{00|78} run folders
 #   DATE_PREFIX       = YYYY-MM-DD for final matrix CSV (default: today, Europe/Vienna)
 #   MATRIX_OUTPUT_DIR = optional matrix output directory
-#   MAP_FILE          = semicolon CSV mapping (default: 2026-06-05_MM_mapping_ds.csv)
+#   MAP_FILE          = semicolon CSV mapping (default: <repo>/2026-06-05_MM_mapping_ds.csv)
+#   MATRIX_CREATION_ROOT = repo root (default: directory containing this script)
 #   BE_PRICE_FILTER, PHASES_FILTER = parallel shards (see run_matrix_pipeline.sh)
-MAGPIE_OUTPUT_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
-MATRIX_CREATION_ROOT <- "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/matrix_creation"
+get_script_dir <- function() {
+  args <- commandArgs(trailingOnly = FALSE)
+  script_path <- sub("--file=", "", args[grep("--file=", args)])
+  if (length(script_path) == 0) {
+    return(normalizePath(getwd()))
+  }
+  dirname(normalizePath(script_path[1]))
+}
+
+MAGPIE_OUTPUT_ROOT <- Sys.getenv(
+  "MAGPIE_OUTPUT_ROOT",
+  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
+)
+MATRIX_CREATION_ROOT <- Sys.getenv("MATRIX_CREATION_ROOT", get_script_dir())
 
 scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
 date_prefix <- Sys.getenv(
