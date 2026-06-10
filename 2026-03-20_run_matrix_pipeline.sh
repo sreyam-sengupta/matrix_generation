@@ -46,7 +46,7 @@ WOOD_SCRIPT="$SCRIPT_DIR/2026-04-09_add_woodfuel_to_bioenergy.R"
 export MATRIX_CREATION_ROOT="${MATRIX_CREATION_ROOT:-$SCRIPT_DIR}"
 export MAP_FILE="${MAP_FILE:-$MATRIX_CREATION_ROOT/2026-06-05_MM_mapping_ds.csv}"
 
-MAGPIE_OUTPUT_ROOT="${MAGPIE_OUTPUT_ROOT:-/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output}"
+MAGPIE_OUTPUT_ROOT="${MAGPIE_OUTPUT_ROOT:-}"
 DATE_PREFIX="${DATE_PREFIX:-$(TZ=Europe/Vienna date +%Y-%m-%d)}"
 TARGET_SCENARIOS="${TARGET_SCENARIOS:-baseline}"
 
@@ -62,6 +62,10 @@ magpie_input_dir() {
     if [[ -n "${MASPIE_OUTPUT_DIR:-}" ]]; then
         echo "$MASPIE_OUTPUT_DIR"
         return
+    fi
+    if [[ -z "${MAGPIE_OUTPUT_ROOT:-}" ]]; then
+        echo "ERROR: Set MASPIE_OUTPUT_DIR or MAGPIE_OUTPUT_ROOT before running the pipeline." >&2
+        exit 1
     fi
     local ssp="SSP2_BD00"
     if [[ " ${BD78_SCENARIOS[*]} " =~ " ${variant} " ]]; then

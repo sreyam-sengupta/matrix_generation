@@ -27,10 +27,7 @@ get_script_dir <- function() {
   dirname(normalizePath(script_path[1]))
 }
 
-MAGPIE_OUTPUT_ROOT <- Sys.getenv(
-  "MAGPIE_OUTPUT_ROOT",
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
-)
+MAGPIE_OUTPUT_ROOT <- Sys.getenv("MAGPIE_OUTPUT_ROOT", "")
 MATRIX_CREATION_ROOT <- Sys.getenv("MATRIX_CREATION_ROOT", get_script_dir())
 
 scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
@@ -426,6 +423,34 @@ strip_units <- function(var_name) {
     result <- gsub("^\\s*", "", result)
     return(result)
   }, USE.NAMES = FALSE)
+}
+
+# Align raw magpie variable names to mapping piam_variable strings (incl. units).
+# Raw files from report.mif often carry Unit = N/A; write.reportProject needs names
+# like "SDG|SDG15|Terrestrial biodiversity (index)" to match the mapping file.
+align_raw_names_to_mapping <- function(x, mapping) {
+  vars <- getNames(x, dim = "variable")
+  piam_vars <- unique(mapping$piam_variable)
+  piam_vars <- piam_vars[!grepl("^ZERO", piam_vars, ignore.case = TRUE)]
+  piam_bases <- strip_units(piam_vars)
+
+  new_names <- vars
+  for (i in seq_along(vars)) {
+    base <- strip_units(vars[i])
+    hit <- match(base, piam_bases)
+    if (!is.na(hit)) {
+      new_names[i] <- piam_vars[hit]
+    }
+  }
+
+  changed <- sum(new_names != vars)
+  if (changed > 0) {
+    getNames(x, dim = "variable") <- new_names
+    message(
+      "Aligned ", changed, " raw variable name(s) to mapping piam_variable format"
+    )
+  }
+  x
 }
 
 # Loop over BE prices
@@ -996,6 +1021,7 @@ for (be_idx in seq_along(be_price_values)) {
         message(run_folder, ": remap and merge into ", ofile)
 
         a_raw <- read.report(file = of_raw, as.list = FALSE)
+        a_raw <- align_raw_names_to_mapping(a_raw, mapping_df)
         # Check if mapping file exists and has content
         # Try to write mapped report
         a_mapped <- write.reportProject(a_raw, mapping = map_file_for_project, file = of_map)
@@ -1145,7 +1171,9 @@ if ("matrix" %in% phases && !loop) {
     # Add missing mapping targets as zero-filled rows (IAMC Variable not produced by map step)
     old_vars <- vars_to_keep
     new_vars <- unique(a$Variable)
-    missing_vars <- old_vars[!old_vars %in% new_vars]
+    missing_vars <- old_vars[
+      !strip_units(old_vars) %in% strip_units(new_vars)
+    ]
     
     if (length(missing_vars) > 0) {
       message("Adding ", length(missing_vars), " missing variables as zero-filled rows: ", paste(head(missing_vars, 3), collapse = ", "), if(length(missing_vars) > 3) "..." else "")

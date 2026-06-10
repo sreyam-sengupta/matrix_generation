@@ -33,10 +33,7 @@ get_script_dir <- function() {
   dirname(normalizePath(script_path[1]))
 }
 
-MAGPIE_OUTPUT_ROOT <- Sys.getenv(
-  "MAGPIE_OUTPUT_ROOT",
-  "/p/projects/magpie/users/sreyamse/magpie/projects/PIK_2026-03-10/magpie/output"
-)
+MAGPIE_OUTPUT_ROOT <- Sys.getenv("MAGPIE_OUTPUT_ROOT", "")
 MATRIX_CREATION_ROOT <- Sys.getenv("MATRIX_CREATION_ROOT", get_script_dir())
 
 scenario_variant <- tolower(Sys.getenv("SCENARIO_VARIANT", "baseline"))
